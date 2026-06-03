@@ -99,8 +99,7 @@ This repository is designed for both skills.sh installation and local skillify c
 
 ```bash
 npm test
-GBRAIN_SKILLS_DIR="$PWD/skills" gbrain skillify check \
-  skills/sdk-onboarding-audit/scripts/run_sdk_onboarding_audit.py
+npm run skillify
 npx skills add . --list
 ```
 

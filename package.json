@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs test/e2e/*.test.mjs",
-    "skillify": "GBRAIN_SKILLS_DIR=\"$PWD/skills\" gbrain skillify check skills/sdk-onboarding-audit/scripts/run_sdk_onboarding_audit.py",
+    "skillify": "tmpdir=$(mktemp -d); rsync -a --exclude .git ./ \"$tmpdir/apostl-skillify-check/\"; cd \"$tmpdir/apostl-skillify-check\" && GBRAIN_SKILLS_DIR=\"$PWD/skills\" gbrain skillify check skills/sdk-onboarding-audit/scripts/run_sdk_onboarding_audit.py; rc=$?; rm -r \"$tmpdir\"; exit $rc",
     "skills:list": "npx skills add . --list"
   },
   "keywords": [
