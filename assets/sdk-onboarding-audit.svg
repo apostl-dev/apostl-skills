@@ -1,0 +1,46 @@
+<svg width="1440" height="520" viewBox="0 0 1440 520" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Apostl SDK Onboarding Audit</title>
+  <desc id="desc">A hero illustration showing source docs, clean run, evidence logs, and report handoff.</desc>
+  <rect width="1440" height="520" fill="#0D1117"/>
+  <rect x="52" y="52" width="1336" height="416" rx="28" fill="#111827" stroke="#263244"/>
+  <circle cx="107" cy="106" r="10" fill="#F97066"/>
+  <circle cx="139" cy="106" r="10" fill="#FDB022"/>
+  <circle cx="171" cy="106" r="10" fill="#32D583"/>
+  <text x="92" y="182" fill="#F9FAFB" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="58" font-weight="760" letter-spacing="0">SDK Onboarding Audit</text>
+  <text x="94" y="226" fill="#A7B0BE" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="22" font-weight="450" letter-spacing="0">Clean-env developer journey verification for SDK launches, quickstarts, CLIs, and agent skills.</text>
+  <g transform="translate(96 280)">
+    <rect x="0" y="0" width="222" height="88" rx="14" fill="#162033" stroke="#314158"/>
+    <text x="24" y="36" fill="#D1D5DB" font-family="Inter, ui-sans-serif, system-ui" font-size="17" font-weight="700">1. Source docs</text>
+    <text x="24" y="64" fill="#8D97A8" font-family="Inter, ui-sans-serif, system-ui" font-size="14">snapshot promises</text>
+    <path d="M222 44H286" stroke="#44546A" stroke-width="2"/>
+  </g>
+  <g transform="translate(382 280)">
+    <rect x="0" y="0" width="222" height="88" rx="14" fill="#102A2D" stroke="#245860"/>
+    <text x="24" y="36" fill="#D1FAE5" font-family="Inter, ui-sans-serif, system-ui" font-size="17" font-weight="700">2. Clean run</text>
+    <text x="24" y="64" fill="#8DD7CD" font-family="Inter, ui-sans-serif, system-ui" font-size="14">execute exact commands</text>
+    <path d="M222 44H286" stroke="#44546A" stroke-width="2"/>
+  </g>
+  <g transform="translate(668 280)">
+    <rect x="0" y="0" width="222" height="88" rx="14" fill="#2B2131" stroke="#68447A"/>
+    <text x="24" y="36" fill="#F5D0FE" font-family="Inter, ui-sans-serif, system-ui" font-size="17" font-weight="700">3. Evidence</text>
+    <text x="24" y="64" fill="#D8B4FE" font-family="Inter, ui-sans-serif, system-ui" font-size="14">stdout, stderr, exit codes</text>
+    <path d="M222 44H286" stroke="#44546A" stroke-width="2"/>
+  </g>
+  <g transform="translate(954 280)">
+    <rect x="0" y="0" width="222" height="88" rx="14" fill="#2A2513" stroke="#61532B"/>
+    <text x="24" y="36" fill="#FEF3C7" font-family="Inter, ui-sans-serif, system-ui" font-size="17" font-weight="700">4. Report</text>
+    <text x="24" y="64" fill="#FDE68A" font-family="Inter, ui-sans-serif, system-ui" font-size="14">activation-risk fix map</text>
+  </g>
+  <g transform="translate(998 122)">
+    <rect width="294" height="96" rx="18" fill="#0B1220" stroke="#314158"/>
+    <text x="24" y="36" fill="#93C5FD" font-family="Inter, ui-sans-serif, system-ui" font-size="15" font-weight="700">Apostl proof loop</text>
+    <text x="24" y="63" fill="#CBD5E1" font-family="Inter, ui-sans-serif, system-ui" font-size="14">free local preview to</text>
+    <text x="24" y="83" fill="#CBD5E1" font-family="Inter, ui-sans-serif, system-ui" font-size="14">continuous release readiness</text>
+  </g>
+  <rect x="94" y="414" width="404" height="30" rx="15" fill="#162033"/>
+  <text x="113" y="435" fill="#B8C2D1" font-family="Inter, ui-sans-serif, system-ui" font-size="14">npx skills add apostl-dev/apostl-skills</text>
+  <rect x="526" y="414" width="312" height="30" rx="15" fill="#102A2D"/>
+  <text x="545" y="435" fill="#9BE3D8" font-family="Inter, ui-sans-serif, system-ui" font-size="14">command-level repros</text>
+  <rect x="866" y="414" width="346" height="30" rx="15" fill="#2B2131"/>
+  <text x="885" y="435" fill="#E9D5FF" font-family="Inter, ui-sans-serif, system-ui" font-size="14">founder-readable reports</text>
+</svg>

@@ -1,0 +1,22 @@
+{
+  "name": "apostl-skills",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Public Apostl agent skills for developer journey verification.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs test/e2e/*.test.mjs",
+    "skillify": "GBRAIN_SKILLS_DIR=\"$PWD/skills\" gbrain skillify check skills/sdk-onboarding-audit/scripts/run_sdk_onboarding_audit.py",
+    "skills:list": "npx skills add . --list"
+  },
+  "keywords": [
+    "agent-skills",
+    "skills",
+    "codex",
+    "claude-code",
+    "developer-experience",
+    "sdk",
+    "devrel"
+  ],
+  "license": "MIT"
+}

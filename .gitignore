@@ -1,0 +1,10 @@
+.DS_Store
+.tmp/
+node_modules/
+coverage/
+*.log
+*.pyc
+__pycache__/
+.env
+token.json
+credentials.json

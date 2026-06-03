@@ -1,0 +1,6 @@
+{"intent":"demo onboarding review for this SDK launch","expected_skill":"sdk-onboarding-audit"}
+{"intent":"go through their SDK quickstarts and tell me if onboarding is broken","expected_skill":"sdk-onboarding-audit"}
+{"intent":"audit this API client quickstart from a clean env","expected_skill":"sdk-onboarding-audit"}
+{"intent":"check whether this CLI demo works for a new developer","expected_skill":"sdk-onboarding-audit"}
+{"intent":"make a free onboarding review report for this SDK as a skill preview","expected_skill":"sdk-onboarding-audit"}
+{"intent":"package the demo onboarding check as a top-of-funnel skill with a PDF report","expected_skill":"sdk-onboarding-audit"}
