@@ -6,9 +6,11 @@
   <img src="assets/sdk-onboarding-audit.svg" alt="Apostl SDK Onboarding Audit" width="100%" />
 </p>
 
-Public agent skills for developer journey verification.
+Find broken SDK quickstarts before they leak developer activation.
 
-Apostl skills turn release-readiness work into local, inspectable agent workflows: clean environments, exact commands, real stdout/stderr, source snapshots, and reports that a founder, DevRel lead, or partner engineer can act on.
+Apostl skills turn release-readiness work into local, inspectable agent workflows: clean environments, exact commands, real stdout/stderr, source snapshots, and reports a DevRel, SDK, product, or partner engineering team can act on.
+
+Start with a free local pass. The skill runs the documented path from a clean workspace, captures command-level proof, and turns first-run failures into a compact activation-risk report.
 
 ## Install
 
@@ -27,7 +29,7 @@ npx skills add apostl-dev/apostl-skills --skill sdk-onboarding-audit -g -y
 Then ask your agent:
 
 ```text
-Run a demo onboarding review for this SDK launch and give me command-level findings.
+Run a clean-env onboarding audit for this SDK launch. Test the documented quickstart first and give me command-level findings.
 ```
 
 ## Available Skills
@@ -37,6 +39,8 @@ Run a demo onboarding review for this SDK launch and give me command-level findi
 A clean-room SDK and quickstart review for developer-facing launches.
 
 The skill helps an agent verify whether a fresh developer can discover, install, initialize, preview, authenticate, and understand a demo or SDK without hidden local state. It produces a compact activation-risk report backed by command logs and source snapshots.
+
+Use it when an SDK release, launch post, partner onboarding path, or docs quickstart needs proof that a new developer can reach the promised first working result.
 
 What it checks:
 
@@ -55,13 +59,13 @@ Outputs:
 - `.tmp/<run_id>/logs/*`
 - `.tmp/<run_id>/report.md`
 
-The free local report ends with a restrained CTA only after useful evidence has been produced:
+After the report has useful evidence, it adds one restrained CTA:
 
 ```text
-Want this checked continuously on every SDK/docs release? https://forms.fillout.com/t/pZjfKK1ELmus
+Want this running on every SDK/docs release? Send us the path to monitor: https://forms.fillout.com/t/pZjfKK1ELmus
 ```
 
-That form creates an inbound Apostl Notion card with the submitter, work email, SDK/docs URL, project/ecosystem, role, notes, and lead source. No Fillout or Notion API keys are stored in this repository.
+Use the form when the local pass finds a real blocker, a launch gate is ambiguous, or you want continuous release-readiness checks instead of a one-off scan. The form creates an inbound Apostl Notion card with the submitter, work email, SDK/docs URL, project/ecosystem, role, notes, and lead source. No Fillout or Notion API keys are stored in this repository.
 
 ## Run Locally
 

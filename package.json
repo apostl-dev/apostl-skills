@@ -2,7 +2,7 @@
   "name": "apostl-skills",
   "version": "1.0.0",
   "private": true,
-  "description": "Public Apostl agent skills for developer journey verification.",
+  "description": "Public Apostl agent skills for SDK onboarding and release-readiness checks.",
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs test/e2e/*.test.mjs",

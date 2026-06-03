@@ -1,46 +1,174 @@
-<svg width="1440" height="520" viewBox="0 0 1440 520" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">Apostl SDK Onboarding Audit</title>
-  <desc id="desc">A hero illustration showing source docs, clean run, evidence logs, and report handoff.</desc>
-  <rect width="1440" height="520" fill="#0D1117"/>
-  <rect x="52" y="52" width="1336" height="416" rx="28" fill="#111827" stroke="#263244"/>
-  <circle cx="107" cy="106" r="10" fill="#F97066"/>
-  <circle cx="139" cy="106" r="10" fill="#FDB022"/>
-  <circle cx="171" cy="106" r="10" fill="#32D583"/>
-  <text x="92" y="182" fill="#F9FAFB" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="58" font-weight="760" letter-spacing="0">SDK Onboarding Audit</text>
-  <text x="94" y="226" fill="#A7B0BE" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="22" font-weight="450" letter-spacing="0">Clean-env developer journey verification for SDK launches, quickstarts, CLIs, and agent skills.</text>
-  <g transform="translate(96 280)">
-    <rect x="0" y="0" width="222" height="88" rx="14" fill="#162033" stroke="#314158"/>
-    <text x="24" y="36" fill="#D1D5DB" font-family="Inter, ui-sans-serif, system-ui" font-size="17" font-weight="700">1. Source docs</text>
-    <text x="24" y="64" fill="#8D97A8" font-family="Inter, ui-sans-serif, system-ui" font-size="14">snapshot promises</text>
-    <path d="M222 44H286" stroke="#44546A" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 360" width="1000" height="360">
+  <defs>
+    <linearGradient id="line-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#704cff" stop-opacity="0"/>
+      <stop offset="25%" stop-color="#ff4d98" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#704cff" stop-opacity="0.8"/>
+      <stop offset="75%" stop-color="#19d3b0" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#4a8dff" stop-opacity="0"/>
+    </linearGradient>
+    <style>
+      @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+      @keyframes pulse-pink {
+        0%,100% { fill: #ff4d98; opacity: 0.75; filter: drop-shadow(0 0 2px rgba(255, 77, 152, 0.4)); }
+        50% { fill: #ff4d98; opacity: 1; filter: drop-shadow(0 0 10px rgba(255, 77, 152, 0.9)); }
+      }
+      @keyframes pulse-purple {
+        0%,100% { fill: #704cff; opacity: 0.75; filter: drop-shadow(0 0 2px rgba(112, 76, 255, 0.4)); }
+        50% { fill: #704cff; opacity: 1; filter: drop-shadow(0 0 10px rgba(112, 76, 255, 0.9)); }
+      }
+      @keyframes pulse-teal {
+        0%,100% { fill: #19d3b0; opacity: 0.75; filter: drop-shadow(0 0 2px rgba(25, 211, 176, 0.4)); }
+        50% { fill: #19d3b0; opacity: 1; filter: drop-shadow(0 0 10px rgba(25, 211, 176, 0.9)); }
+      }
+      @keyframes pulse-blue {
+        0%,100% { fill: #4a8dff; opacity: 0.75; filter: drop-shadow(0 0 2px rgba(74, 141, 255, 0.4)); }
+        50% { fill: #4a8dff; opacity: 1; filter: drop-shadow(0 0 10px rgba(74, 141, 255, 0.9)); }
+      }
+      @keyframes spark { 0%,100% { opacity: 0.05; transform: translateY(0px); } 50% { opacity: 0.8; transform: translateY(-4px); } }
+      .cursor { animation: blink 1s step-end infinite; }
+      .lt-pink { animation: pulse-pink 2.4s ease-in-out infinite; }
+      .lt-purple { animation: pulse-purple 2.4s ease-in-out infinite; }
+      .lt-teal { animation: pulse-teal 2.4s ease-in-out infinite; }
+      .lt-blue { animation: pulse-blue 2.4s ease-in-out infinite; }
+      .spark { opacity: 0.05; animation: spark 3.5s ease-in-out infinite; }
+    </style>
+  </defs>
+
+  <rect width="1000" height="360" rx="16" fill="#070913"/>
+  <rect width="1000" height="360" rx="16" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+
+  <!-- Sparks -->
+  <g>
+    <rect x="65" y="160" width="6" height="6" rx="1.5" fill="#4a8dff" class="spark" style="animation-delay:0.273s"/>
+    <rect x="42" y="250" width="6" height="6" rx="1.5" fill="#ff4d98" class="spark" style="animation-delay:0.459s"/>
+    <rect x="70" y="232" width="6" height="6" rx="1.5" fill="#4a8dff" class="spark" style="animation-delay:1.789s"/>
+    <rect x="128" y="127" width="6" height="6" rx="1.5" fill="#4a8dff" class="spark" style="animation-delay:1.587s"/>
+    <rect x="171" y="250" width="6" height="6" rx="1.5" fill="#ff4d98" class="spark" style="animation-delay:2.041s"/>
+    <rect x="59" y="204" width="6" height="6" rx="1.5" fill="#19d3b0" class="spark" style="animation-delay:2.306s"/>
+    <rect x="117" y="58" width="6" height="6" rx="1.5" fill="#19d3b0" class="spark" style="animation-delay:1.304s"/>
+    <rect x="146" y="30" width="6" height="6" rx="1.5" fill="#19d3b0" class="spark" style="animation-delay:2.916s"/>
+    <rect x="75" y="159" width="6" height="6" rx="1.5" fill="#ff4d98" class="spark" style="animation-delay:2.612s"/>
+    <rect x="106" y="245" width="6" height="6" rx="1.5" fill="#704cff" class="spark" style="animation-delay:0.459s"/>
+    <rect x="71" y="168" width="6" height="6" rx="1.5" fill="#ff4d98" class="spark" style="animation-delay:1.797s"/>
+    <rect x="155" y="34" width="6" height="6" rx="1.5" fill="#ff4d98" class="spark" style="animation-delay:2.787s"/>
+    <rect x="878" y="91" width="6" height="6" rx="1.5" fill="#ff4d98" class="spark" style="animation-delay:0.723s"/>
+    <rect x="945" y="50" width="6" height="6" rx="1.5" fill="#ff4d98" class="spark" style="animation-delay:2.196s"/>
+    <rect x="817" y="224" width="6" height="6" rx="1.5" fill="#704cff" class="spark" style="animation-delay:0.385s"/>
+    <rect x="921" y="170" width="6" height="6" rx="1.5" fill="#704cff" class="spark" style="animation-delay:0.795s"/>
+    <rect x="955" y="138" width="6" height="6" rx="1.5" fill="#704cff" class="spark" style="animation-delay:2.787s"/>
+    <rect x="851" y="212" width="6" height="6" rx="1.5" fill="#19d3b0" class="spark" style="animation-delay:1.197s"/>
+    <rect x="966" y="125" width="6" height="6" rx="1.5" fill="#4a8dff" class="spark" style="animation-delay:2.699s"/>
+    <rect x="915" y="60" width="6" height="6" rx="1.5" fill="#704cff" class="spark" style="animation-delay:0.674s"/>
+    <rect x="886" y="35" width="6" height="6" rx="1.5" fill="#704cff" class="spark" style="animation-delay:1.765s"/>
+    <rect x="801" y="48" width="6" height="6" rx="1.5" fill="#ff4d98" class="spark" style="animation-delay:0.687s"/>
+    <rect x="808" y="250" width="6" height="6" rx="1.5" fill="#19d3b0" class="spark" style="animation-delay:0.213s"/>
+    <rect x="860" y="101" width="6" height="6" rx="1.5" fill="#4a8dff" class="spark" style="animation-delay:0.643s"/>
   </g>
-  <g transform="translate(382 280)">
-    <rect x="0" y="0" width="222" height="88" rx="14" fill="#102A2D" stroke="#245860"/>
-    <text x="24" y="36" fill="#D1FAE5" font-family="Inter, ui-sans-serif, system-ui" font-size="17" font-weight="700">2. Clean run</text>
-    <text x="24" y="64" fill="#8DD7CD" font-family="Inter, ui-sans-serif, system-ui" font-size="14">execute exact commands</text>
-    <path d="M222 44H286" stroke="#44546A" stroke-width="2"/>
+
+  <!-- Letter Grid -->
+  <g>
+    <rect x="261" y="75" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.151s"/>
+    <rect x="276" y="75" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.045s"/>
+    <rect x="291" y="75" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.495s"/>
+    <rect x="246" y="90" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.402s"/>
+    <rect x="306" y="90" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.326s"/>
+    <rect x="246" y="105" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.218s"/>
+    <rect x="306" y="105" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.606s"/>
+    <rect x="246" y="120" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.156s"/>
+    <rect x="261" y="120" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.759s"/>
+    <rect x="276" y="120" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.054s"/>
+    <rect x="291" y="120" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.394s"/>
+    <rect x="306" y="120" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.910s"/>
+    <rect x="246" y="135" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.048s"/>
+    <rect x="306" y="135" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.358s"/>
+    <rect x="246" y="150" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.170s"/>
+    <rect x="306" y="150" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.981s"/>
+    <rect x="246" y="165" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.397s"/>
+    <rect x="306" y="165" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.061s"/>
+    <rect x="333" y="75" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.457s"/>
+    <rect x="348" y="75" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.012s"/>
+    <rect x="363" y="75" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.450s"/>
+    <rect x="378" y="75" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.257s"/>
+    <rect x="333" y="90" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.612s"/>
+    <rect x="393" y="90" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.280s"/>
+    <rect x="333" y="105" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.723s"/>
+    <rect x="393" y="105" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.606s"/>
+    <rect x="333" y="120" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.167s"/>
+    <rect x="348" y="120" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.174s"/>
+    <rect x="363" y="120" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.525s"/>
+    <rect x="378" y="120" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.087s"/>
+    <rect x="333" y="135" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.453s"/>
+    <rect x="333" y="150" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:1.314s"/>
+    <rect x="333" y="165" width="12" height="12" rx="2" class="lt-pink" style="animation-delay:0.965s"/>
+    <rect x="435" y="75" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.752s"/>
+    <rect x="450" y="75" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.681s"/>
+    <rect x="465" y="75" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.994s"/>
+    <rect x="420" y="90" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.493s"/>
+    <rect x="480" y="90" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.113s"/>
+    <rect x="420" y="105" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.551s"/>
+    <rect x="480" y="105" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.039s"/>
+    <rect x="420" y="120" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.268s"/>
+    <rect x="480" y="120" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.082s"/>
+    <rect x="420" y="135" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.410s"/>
+    <rect x="480" y="135" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.521s"/>
+    <rect x="420" y="150" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.144s"/>
+    <rect x="480" y="150" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.419s"/>
+    <rect x="435" y="165" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.182s"/>
+    <rect x="450" y="165" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:0.500s"/>
+    <rect x="465" y="165" width="12" height="12" rx="2" class="lt-purple" style="animation-delay:1.144s"/>
+    <rect x="522" y="75" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:0.657s"/>
+    <rect x="537" y="75" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:0.666s"/>
+    <rect x="552" y="75" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:0.377s"/>
+    <rect x="567" y="75" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:0.481s"/>
+    <rect x="507" y="90" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.686s"/>
+    <rect x="507" y="105" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.166s"/>
+    <rect x="522" y="120" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.096s"/>
+    <rect x="537" y="120" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:0.308s"/>
+    <rect x="552" y="120" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.312s"/>
+    <rect x="567" y="135" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:0.294s"/>
+    <rect x="567" y="150" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:0.683s"/>
+    <rect x="507" y="165" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.781s"/>
+    <rect x="522" y="165" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.152s"/>
+    <rect x="537" y="165" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.003s"/>
+    <rect x="552" y="165" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.232s"/>
+    <rect x="594" y="75" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.517s"/>
+    <rect x="609" y="75" width="12" height="12" rx="2" class="lt-teal" style="animation-delay:1.397s"/>
+    <rect x="624" y="75" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.412s"/>
+    <rect x="639" y="75" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.058s"/>
+    <rect x="654" y="75" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.568s"/>
+    <rect x="624" y="90" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.482s"/>
+    <rect x="624" y="105" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.380s"/>
+    <rect x="624" y="120" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:1.697s"/>
+    <rect x="624" y="135" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:1.577s"/>
+    <rect x="624" y="150" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.566s"/>
+    <rect x="624" y="165" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:1.180s"/>
+    <rect x="681" y="75" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.712s"/>
+    <rect x="681" y="90" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:1.646s"/>
+    <rect x="681" y="105" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.826s"/>
+    <rect x="681" y="120" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.477s"/>
+    <rect x="681" y="135" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.444s"/>
+    <rect x="681" y="150" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:1.010s"/>
+    <rect x="681" y="165" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.473s"/>
+    <rect x="696" y="165" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:1.052s"/>
+    <rect x="711" y="165" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:1.616s"/>
+    <rect x="726" y="165" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.719s"/>
+    <rect x="741" y="165" width="12" height="12" rx="2" class="lt-blue" style="animation-delay:0.395s"/>
   </g>
-  <g transform="translate(668 280)">
-    <rect x="0" y="0" width="222" height="88" rx="14" fill="#2B2131" stroke="#68447A"/>
-    <text x="24" y="36" fill="#F5D0FE" font-family="Inter, ui-sans-serif, system-ui" font-size="17" font-weight="700">3. Evidence</text>
-    <text x="24" y="64" fill="#D8B4FE" font-family="Inter, ui-sans-serif, system-ui" font-size="14">stdout, stderr, exit codes</text>
-    <path d="M222 44H286" stroke="#44546A" stroke-width="2"/>
-  </g>
-  <g transform="translate(954 280)">
-    <rect x="0" y="0" width="222" height="88" rx="14" fill="#2A2513" stroke="#61532B"/>
-    <text x="24" y="36" fill="#FEF3C7" font-family="Inter, ui-sans-serif, system-ui" font-size="17" font-weight="700">4. Report</text>
-    <text x="24" y="64" fill="#FDE68A" font-family="Inter, ui-sans-serif, system-ui" font-size="14">activation-risk fix map</text>
-  </g>
-  <g transform="translate(998 122)">
-    <rect width="294" height="96" rx="18" fill="#0B1220" stroke="#314158"/>
-    <text x="24" y="36" fill="#93C5FD" font-family="Inter, ui-sans-serif, system-ui" font-size="15" font-weight="700">Apostl proof loop</text>
-    <text x="24" y="63" fill="#CBD5E1" font-family="Inter, ui-sans-serif, system-ui" font-size="14">free local preview to</text>
-    <text x="24" y="83" fill="#CBD5E1" font-family="Inter, ui-sans-serif, system-ui" font-size="14">continuous release readiness</text>
-  </g>
-  <rect x="94" y="414" width="404" height="30" rx="15" fill="#162033"/>
-  <text x="113" y="435" fill="#B8C2D1" font-family="Inter, ui-sans-serif, system-ui" font-size="14">npx skills add apostl-dev/apostl-skills</text>
-  <rect x="526" y="414" width="312" height="30" rx="15" fill="#102A2D"/>
-  <text x="545" y="435" fill="#9BE3D8" font-family="Inter, ui-sans-serif, system-ui" font-size="14">command-level repros</text>
-  <rect x="866" y="414" width="346" height="30" rx="15" fill="#2B2131"/>
-  <text x="885" y="435" fill="#E9D5FF" font-family="Inter, ui-sans-serif, system-ui" font-size="14">founder-readable reports</text>
+
+  <!-- Flow Line -->
+  <line x1="120" y1="215" x2="880" y2="215" stroke="url(#line-grad)" stroke-width="1.5"/>
+
+  <!-- Command Line Interface -->
+  <text x="500" y="255" text-anchor="middle"
+    font-family="'Outfit', 'Inter', -apple-system, sans-serif"
+    font-size="20" font-weight="800" fill="#f0f2fa" letter-spacing="1">SDK ONBOARDING AUDIT</text>
+
+  <text x="500" y="285" text-anchor="middle"
+    font-family="'JetBrains Mono', 'Menlo', 'Fira Code', monospace"
+    font-size="14" fill="#19d3b0" letter-spacing="0.5">npx skills add apostl-dev/apostl-skills<tspan class="cursor" fill="#19d3b0">&#9612;</tspan></text>
+
+  <text x="500" y="315" text-anchor="middle"
+    font-family="'Outfit', 'Inter', -apple-system, sans-serif"
+    font-size="11" font-weight="600" fill="#8e98b0" letter-spacing="3.5">LISTEN  ·  DIAGNOSE  ·  FIX  ·  VALIDATE</text>
 </svg>

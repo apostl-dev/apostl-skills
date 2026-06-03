@@ -25,7 +25,7 @@ from typing import Any
 
 
 MAX_CAPTURE_CHARS = 4000
-DEFAULT_CTA_MESSAGE = "Want this checked continuously on every SDK/docs release?"
+DEFAULT_CTA_MESSAGE = "Want this running on every SDK/docs release? Send us the path to monitor:"
 DEFAULT_CTA_URL = "https://forms.fillout.com/t/pZjfKK1ELmus"
 
 
