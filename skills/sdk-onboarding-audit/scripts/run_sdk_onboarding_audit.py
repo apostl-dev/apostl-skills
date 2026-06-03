@@ -333,7 +333,7 @@ def write_report(run_dir: Path, config: dict[str, Any], results: list[dict[str, 
         if url:
             lines.append(f"{message} {url}")
         else:
-            lines.append(f"TODO: {message} Add the full launch-assurance loop URL before publishing.")
+            lines.append(f"TODO: {message} Add the release-readiness product URL before publishing.")
         lines.append("")
     (run_dir / "report.md").write_text("\n".join(lines), encoding="utf-8")
 

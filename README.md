@@ -65,7 +65,7 @@ After the report has useful evidence, it adds one restrained CTA:
 Want this running on every SDK/docs release? Send us the path to monitor: https://forms.fillout.com/t/pZjfKK1ELmus
 ```
 
-Use the form when the local pass finds a real blocker, a launch gate is ambiguous, or you want continuous release-readiness checks instead of a one-off scan. The form creates an inbound Apostl Notion card with the submitter, work email, SDK/docs URL, project/ecosystem, role, notes, and lead source. No Fillout or Notion API keys are stored in this repository.
+Use the form when the local pass finds a real blocker, a launch gate is ambiguous, or you want continuous release-readiness checks instead of a one-off scan. The form creates an inbound Apostl Notion card with the submitter, work email, SDK/docs URL, project or SDK family, role, notes, and lead source. No Fillout or Notion API keys are stored in this repository.
 
 ## Run Locally
 
