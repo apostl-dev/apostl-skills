@@ -316,13 +316,6 @@ def render_markdown(report: dict[str, Any]) -> str:
     for category, score in report["score"]["categories"].items():
         lines.append(f"- {category}: {score} / 100")
 
-    for heading, category in (("Agent-ready Docs", "Docs"), ("Agent-ready Product", "Product")):
-        lines += ["", f"## {heading}", "", "| Check | Status | Evidence |", "| --- | --- | --- |"]
-        for criterion in report["criteria"]:
-            if criterion["category"] == category:
-                result = report["results"][criterion["id"]]
-                lines.append(f"| `{criterion['id']}` | {result['status']} | {_value(result.get('evidence'))} |")
-
     lines += [
         "", "## Source/corpus coverage", "",
         "| Discovered | Eligible | Attempted | Passed | Failed | Blocked | Not run | Excluded |",
@@ -331,6 +324,13 @@ def render_markdown(report: dict[str, Any]) -> str:
     counts = report["corpus"]["counts"]
     lines.append("| " + " | ".join(str(counts[key]) for key in ("discovered", "eligible", "attempted", "passed", "failed", "blocked", "not_run", "excluded")) + " |")
     lines.append(f"\nFull documentation covered: **{'yes' if report['corpus']['full_documentation_covered'] else 'no'}**")
+
+    for heading, category in (("Agent-ready Docs", "Docs"), ("Agent-ready Product", "Product")):
+        lines += ["", f"## {heading}", "", "| Check | Status | Evidence |", "| --- | --- | --- |"]
+        for criterion in report["criteria"]:
+            if criterion["category"] == category:
+                result = report["results"][criterion["id"]]
+                lines.append(f"| `{criterion['id']}` | {result['status']} | {_value(result.get('evidence'))} |")
 
     lines += ["", "## Agent quickstart trace", "", f"- Status: {report['agent_journey'].get('status', 'not_run')}", f"- Activation reached: {report['agent_journey'].get('activation_reached', False)}"]
     for step in report["agent_journey"].get("steps", []):
@@ -379,15 +379,15 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.append("2. Re-run the exact activation journey in a clean environment.")
     lines.append("3. Turn current passing evidence into a recurring release gate.")
     lines += ["", "## Recurring-check recommendations", "", "- Re-run static agent-doc checks on docs releases and the selected first-value journey on product releases."]
-    lines += ["", "## Public artifact links", ""]
-    for artifact in report["public_artifacts"]:
-        lines.append(f"- {_value(artifact.get('name'))}: {_value(artifact.get('url'))}")
     lines += ["", "## Provenance", ""]
     for source in report["provenance"]:
         lines.append(f"- {_value(source.get('url'))} — retrieved {_value(source.get('retrieved_at'))}; version {_value(source.get('version'))}")
     lines += ["", "## Limitations", ""]
     for limitation in report["limitations"]:
         lines.append(f"- {limitation}")
+    lines += ["", "## Public artifact links", ""]
+    for artifact in report["public_artifacts"]:
+        lines.append(f"- {_value(artifact.get('name'))}: {_value(artifact.get('url'))}")
     return "\n".join(lines).rstrip() + "\n"
 
 

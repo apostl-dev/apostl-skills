@@ -228,6 +228,41 @@ class AuditTest(unittest.TestCase):
         self.assertIn("missing", markdown.lower())
         self.assertNotIn("$100,000", markdown)
 
+    def test_report_sections_follow_the_published_contract_order(self):
+        evidence = {
+            "journey": {"name": "Quickstart", "target": "agent", "activation_event": "hello rendered"},
+            "checks": {},
+            "agent_journey": {"status": "not_run", "activation_reached": False},
+            "human_journey": {"status": "not_run"},
+            "corpus": {"mode": "sample", "rows": []},
+            "frictions": [],
+        }
+
+        markdown = self.audit.render_markdown(self.audit.build_report(self.rubric, evidence))
+        headings = [line.removeprefix("## ") for line in markdown.splitlines() if line.startswith("## ")]
+
+        self.assertEqual([
+            "Executive verdict",
+            "Business impact",
+            "Scope and environment",
+            "Score and rubric version",
+            "Source/corpus coverage",
+            "Agent-ready Docs",
+            "Agent-ready Product",
+            "Agent quickstart trace",
+            "Human Frictions",
+            "Guide-by-guide coverage",
+            "Deduplicated friction evidence",
+            "Proposed fixes through activation",
+            "RICE roadmap",
+            "30 / 60 / 90 day plan",
+            "Final action plan",
+            "Recurring-check recommendations",
+            "Provenance",
+            "Limitations",
+            "Public artifact links",
+        ], headings)
+
 
 if __name__ == "__main__":
     unittest.main()

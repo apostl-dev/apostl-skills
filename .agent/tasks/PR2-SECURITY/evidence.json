@@ -1,0 +1,48 @@
+{
+  "task_id": "PR2-SECURITY",
+  "verdict": "PASS",
+  "acceptance_criteria": {
+    "AC1": "PASS",
+    "AC2": "PASS",
+    "AC3": "PASS",
+    "AC4": "PASS",
+    "AC5": "PASS",
+    "AC6": "PASS",
+    "AC7": "PASS",
+    "AC8": "PASS"
+  },
+  "tests": {
+    "npm_test": {"passed": 8, "failed": 0},
+    "agent_native_python": {"passed": 27, "failed": 0},
+    "agent_native_node": {"passed": 5, "failed": 0},
+    "focused_collector": {"passed": 10, "failed": 0},
+    "routing_eval": {"passed": 14, "failed": 0},
+    "synthesis_eval": {"passed": 5, "failed": 0}
+  },
+  "dns_rebinding_regression": {
+    "resolver_calls": 1,
+    "connected_ip": "93.184.216.34",
+    "port": 443,
+    "host_header": "example.com",
+    "tls_server_hostname": "example.com"
+  },
+  "w3schools": {
+    "sample_status": 200,
+    "sample_responses": 9,
+    "artifacts": ["evidence.json", "raw-evidence.json", "report.json", "report.md"],
+    "full_eligible_urls": 127,
+    "full_effective_mode": "sample",
+    "overflow_recorded": true
+  },
+  "validators": {
+    "quick_validate": "PASS",
+    "skillify": "PASS_WITH_OPTIONAL_JSON_EOF_ADVISORY",
+    "skills_list": "PASS",
+    "secret_pattern_scan": "PASS",
+    "urllib_connection_path_scan": "PASS",
+    "independent_forward_verifier": "PASS"
+  },
+  "external_receipts": {
+    "three_provider_post_release": "UNKNOWN_NOT_REQUIRED_FOR_THIS_PR_FIX"
+  }
+}

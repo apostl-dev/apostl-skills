@@ -1,6 +1,6 @@
 {
   "name": "apostl-skills",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Public Apostl agent skills for SDK onboarding and agent-native product readiness.",
   "type": "module",

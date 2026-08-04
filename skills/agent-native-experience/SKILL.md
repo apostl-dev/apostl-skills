@@ -38,7 +38,24 @@ score into activation proof.
    supplied sources. Canonicalize URLs, record redirects/auth/exclusions and
    content hashes, then freeze the corpus before full execution.
 4. Run local non-mutating checks. Use AFDocs directly when available and retain
-   its status/dependency semantics. Feed normalized evidence to:
+   its status/dependency semantics. When AFDocs is unavailable, read
+   [local-evidence-collector.md](references/local-evidence-collector.md) and run
+   the bundled bounded collector:
+
+   ```bash
+   python3 scripts/collect_evidence.py \
+     --url https://example.com/docs/quickstart \
+     --journey "Install and run the quickstart" \
+     --activation-event "Rendered result is visible" \
+     --mode sample \
+     --output-dir ./agent-native-evidence
+   ```
+
+   It writes safe response metadata, normalized evidence, Markdown, and JSON
+   without an account or third-party Python package. It never executes or
+   infers activation: `agent_journey` and `human_journey` remain `not_run` until
+   real evidence is added. Feed normalized or subsequently enriched evidence
+   to:
 
    ```bash
    python3 scripts/audit.py --evidence evidence.json --output report.md --json-output report.json
@@ -117,6 +134,9 @@ non-mutating. Disclose step consumption before submitting a run.
   blockers honestly and leave the recovery action.
 - Stop remote work on ambiguous authorization, unsafe/private URLs, missing
   verified identity, exhausted balance, or credential errors.
+- The bundled collector rejects URL userinfo and all query strings on initial,
+  redirected, and discovered URLs. Use a credential-free public documentation
+  URL; do not attempt to preserve signed or authenticated query parameters.
 - Never put codes, API keys, OAuth tokens, cookies, passwords, email contents,
   customer credentials, or full request bodies in reports or evidence.
 - Redact before saving logs. Keep Apostl keys out of repositories and rotate or

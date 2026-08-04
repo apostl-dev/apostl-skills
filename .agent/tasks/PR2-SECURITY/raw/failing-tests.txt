@@ -1,0 +1,15 @@
+Focused red phase before transport replacement:
+
+- initial `sig`, `signature`, `auth`, `X-Amz-Signature`, and ordinary query
+  cases were accepted;
+- SafeFetcher did not expose resolver/socket injection for a deterministic
+  connection-binding test;
+- discovered query/userinfo links persisted;
+- result: 6 failures and 2 errors.
+
+Independent verifier V1 after the first implementation:
+
+- `Location: /next?` caused two requests because urljoin removed the empty
+  query marker;
+- discovered `/docs/empty?` persisted as `/docs/empty`;
+- result: FAIL, followed by the raw-reference validation fix.
