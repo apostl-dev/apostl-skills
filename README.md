@@ -160,7 +160,9 @@ python3 /path/to/skill-creator/scripts/quick_validate.py skills/agent-native-exp
 Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md); report sensitive issues
 through [SECURITY.md](SECURITY.md). See [Apostl](https://apostl.dev), the
 [platform](https://platform.apostl.dev), and the
-[Agent API contract](https://github.com/apostl-dev/apostl-app/blob/main/docs/agent-api-v1.md).
+[Agent API contract](skills/agent-native-experience/references/apostl-api.md).
+See an [example public report](https://platform.apostl.dev/reports/0d071cf7-e23c-4074-8a42-b46e748a8faa)
+with signed-out HTML, Markdown, events, proof manifest, artifacts, and PDF.
 
 ### [sdk-onboarding-audit](skills/sdk-onboarding-audit)
 
