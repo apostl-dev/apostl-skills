@@ -38,7 +38,24 @@ score into activation proof.
    supplied sources. Canonicalize URLs, record redirects/auth/exclusions and
    content hashes, then freeze the corpus before full execution.
 4. Run local non-mutating checks. Use AFDocs directly when available and retain
-   its status/dependency semantics. Feed normalized evidence to:
+   its status/dependency semantics. When AFDocs is unavailable, read
+   [local-evidence-collector.md](references/local-evidence-collector.md) and run
+   the bundled bounded collector:
+
+   ```bash
+   python3 scripts/collect_evidence.py \
+     --url https://example.com/docs/quickstart \
+     --journey "Install and run the quickstart" \
+     --activation-event "Rendered result is visible" \
+     --mode sample \
+     --output-dir ./agent-native-evidence
+   ```
+
+   It writes safe response metadata, normalized evidence, Markdown, and JSON
+   without an account or third-party Python package. It never executes or
+   infers activation: `agent_journey` and `human_journey` remain `not_run` until
+   real evidence is added. Feed normalized or subsequently enriched evidence
+   to:
 
    ```bash
    python3 scripts/audit.py --evidence evidence.json --output report.md --json-output report.json

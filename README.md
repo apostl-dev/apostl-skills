@@ -88,6 +88,25 @@ python3 skills/agent-native-experience/scripts/generate_hero.py
 3. Start with local/sample mode. Review `report.md` and `report.json`; no Apostl
    account or customer credential is required.
 
+Run the self-contained bounded collector when AFDocs is unavailable:
+
+```bash
+python3 skills/agent-native-experience/scripts/collect_evidence.py \
+  --url https://www.w3schools.com/html/html_intro.asp \
+  --journey "Reproduce the introductory HTML example locally" \
+  --activation-event "The documented heading and paragraph are visible" \
+  --mode sample \
+  --output-dir .tmp/agent-native-w3schools
+```
+
+The command writes `raw-evidence.json`, `evidence.json`, `report.md`, and
+`report.json`. It uses only the Python standard library, performs GET-only
+public-doc checks, rejects private/local/credential-bearing targets, disables
+environment proxies, and enforces request, redirect, response-size, timeout,
+and page limits. Raw response bodies are not persisted. Static collection does
+not prove activation; enrich `evidence.json` with the real agent trace and
+rerun `audit.py` after executing the selected journey.
+
 Inputs are the target URL, selected journey, activation event, and environment.
 Optional inputs include a repository or OpenAPI spec, frozen corpus inventory,
 human observations, and business metrics. Outputs include the report, normalized
