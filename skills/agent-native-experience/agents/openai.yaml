@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Native Experience"
+  short_description: "Audit and prove agent-first product journeys"
+  default_prompt: "Use $agent-native-experience to audit this product for agent readiness and first value."
