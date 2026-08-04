@@ -179,6 +179,29 @@ class AuditTest(unittest.TestCase):
         with self.assertRaises(self.audit.SensitiveOutputError):
             self.audit.build_report(self.rubric, evidence)
 
+    def test_sanitizer_rejects_opaque_secret_field_variants_and_redacts_them_in_lenient_mode(self):
+        canaries = {
+            "client_secret": "opaque-client-value",
+            "refresh_token": "opaque-refresh-value",
+            "CUSTOM_ENV": "opaque-env-value",
+            "private_key_material": "opaque-key-value",
+            "recovery_code": "opaque-code-value",
+            "session_cookie_value": "opaque-cookie-value",
+            "nested": {"database_password_value": "opaque-password-value"},
+        }
+
+        with self.assertRaises(self.audit.SensitiveOutputError):
+            self.audit.sanitize_data(canaries)
+
+        sanitized = self.audit.sanitize_data(canaries, reject_keys=False)
+        serialized = json.dumps(sanitized)
+        for canary in [
+            "opaque-client-value", "opaque-refresh-value", "opaque-env-value",
+            "opaque-key-value", "opaque-code-value", "opaque-cookie-value",
+            "opaque-password-value",
+        ]:
+            self.assertNotIn(canary, serialized)
+
     def test_report_contains_decision_ready_sections_and_visible_rice_assumptions(self):
         evidence = {
             "journey": {"name": "Quickstart", "target": "agent", "activation_event": "hello rendered"},

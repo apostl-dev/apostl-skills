@@ -15,6 +15,14 @@ FORBIDDEN_KEYS = {
     "activation_code", "api_key", "authorization", "cookie", "cookies",
     "password", "secret", "session", "session_id", "token", "oauth_token",
 }
+SENSITIVE_KEY_PARTS = {
+    "authorization", "code", "cookie", "credential", "env", "key",
+    "password", "passphrase", "secret", "session", "token",
+}
+SAFE_KEY_EXCEPTIONS = {
+    "api_key_prefix", "code_block", "code_blocks", "error_code", "exit_code",
+    "status_code", "token_count",
+}
 SECRET_PATTERNS = (
     re.compile(r"\b\d+\|[A-Za-z0-9_-]{8,}\b"),
     re.compile(r"\bBearer\s+[A-Za-z0-9._~+/-]{8,}=*", re.IGNORECASE),
@@ -31,13 +39,23 @@ def redact_text(value: str) -> str:
     return redacted
 
 
+def is_sensitive_key(key: Any) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(key).strip().lower()).strip("_")
+    if normalized in SAFE_KEY_EXCEPTIONS:
+        return False
+    if normalized in FORBIDDEN_KEYS:
+        return True
+    parts = {part for part in normalized.split("_") if part}
+    return bool(parts & SENSITIVE_KEY_PARTS)
+
+
 def sanitize_data(value: Any, *, reject_keys: bool = True, path: str = "output") -> Any:
     if isinstance(value, dict):
         sanitized = {}
         for key, item in value.items():
-            normalized = str(key).strip().lower().replace("-", "_")
             child_path = f"{path}.{key}"
-            if normalized in FORBIDDEN_KEYS:
+            identifier_map = path.endswith(".checks") or path.endswith(".results")
+            if is_sensitive_key(key) and not identifier_map:
                 if reject_keys:
                     raise SensitiveOutputError(f"Sensitive field is not allowed in public output: {child_path}")
                 sanitized[key] = "[REDACTED]"
