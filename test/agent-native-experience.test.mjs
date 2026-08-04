@@ -29,3 +29,27 @@ test('routing eval covers realistic positive and negative prompts', () => {
   assert.ok(lines.some((row) => row.should_trigger && /quickstart|agent/iu.test(row.prompt)));
   assert.ok(lines.some((row) => !row.should_trigger));
 });
+
+test('released source registry identifies the pinned current AFDocs revision', () => {
+  const registry = JSON.parse(readFileSync(resolve(
+    repoRoot,
+    'skills/agent-native-experience/references/sources.v1.json',
+  ), 'utf8'));
+  const afdocs = registry.sources.find((source) => source.id === 'afdocs-checks');
+
+  assert.equal(afdocs.commit, 'fa688db9628d4b68e58bd90bb8625fb1d2c9a29d');
+  assert.match(afdocs.version, /AFDocs v0\.18\.7/u);
+});
+
+test('repository resolver and README expose the public skill journey', () => {
+  const resolver = readFileSync(resolve(repoRoot, 'skills/RESOLVER.md'), 'utf8');
+  const readme = readFileSync(resolve(repoRoot, 'README.md'), 'utf8');
+  const resolverRows = resolver.split('\n')
+    .filter((line) => line.includes('skills/agent-native-experience/SKILL.md'));
+
+  assert.ok(resolverRows.length >= 5, `expected at least five resolver rows, got ${resolverRows.length}`);
+  assert.match(resolver, /agent-native|agent readiness|quickstart friction/iu);
+  assert.match(readme, /\[Agent API contract\]\(skills\/agent-native-experience\/references\/apostl-api\.md\)/u);
+  assert.match(readme, /\[example public report\]\(https:\/\/platform\.apostl\.dev\/reports\/[0-9a-f-]+\)/u);
+  assert.doesNotMatch(readme, /github\.com\/apostl-dev\/apostl-app/u);
+});

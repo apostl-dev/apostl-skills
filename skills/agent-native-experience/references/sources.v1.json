@@ -1,12 +1,12 @@
 {
   "registry_version": "agent-native-experience-sources.v1",
-  "retrieved_at": "2026-08-04",
+  "retrieved_at": "2026-08-05",
   "sources": [
     {
       "id": "afdocs-checks",
       "url": "https://afdocs.dev/checks/",
       "kind": "official",
-      "version": "AFDocs v0.17.0; Agent-Friendly Documentation Spec v0.5.0",
+      "version": "AFDocs v0.18.7; Agent-Friendly Documentation Spec v0.5.0",
       "commit": "fa688db9628d4b68e58bd90bb8625fb1d2c9a29d",
       "use": "Complete 23-check registry, categories, dependencies, weights, and result semantics"
     },
