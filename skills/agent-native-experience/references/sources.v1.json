@@ -1,0 +1,99 @@
+{
+  "registry_version": "agent-native-experience-sources.v1",
+  "retrieved_at": "2026-08-04",
+  "sources": [
+    {
+      "id": "afdocs-checks",
+      "url": "https://afdocs.dev/checks/",
+      "kind": "official",
+      "version": "AFDocs v0.17.0; Agent-Friendly Documentation Spec v0.5.0",
+      "commit": "fa688db9628d4b68e58bd90bb8625fb1d2c9a29d",
+      "use": "Complete 23-check registry, categories, dependencies, weights, and result semantics"
+    },
+    {
+      "id": "agent-docs-spec",
+      "url": "https://agentdocsspec.com/",
+      "kind": "official",
+      "version": "v0.5.0",
+      "use": "Normative agent-friendly documentation behaviors"
+    },
+    {
+      "id": "locus-self-registration",
+      "url": "https://docs.paywithlocus.com/quickstart-beta",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "Agent self-registration, status polling, claim/human fallback, and rate-limit pattern; private-key return is explicitly not adopted"
+    },
+    {
+      "id": "agentmail-quickstart",
+      "url": "https://docs.agentmail.to/quickstart",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "Human email plus OTP activation flow"
+    },
+    {
+      "id": "agentmail-permissions",
+      "url": "https://docs.agentmail.to/permissions",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "Least-privilege API permissions"
+    },
+    {
+      "id": "agentmail-errors",
+      "url": "https://docs.agentmail.to/errors",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "Stable machine error codes, recovery guidance, and idempotency errors"
+    },
+    {
+      "id": "browser-use-claim",
+      "url": "https://docs.browser-use.com/cloud/tutorials/integrations/hermes-agent",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "Agent-created account with optional short-lived human claim flow and local key storage"
+    },
+    {
+      "id": "workos-identity-linking",
+      "url": "https://workos.com/docs/authkit/identity-linking",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "Verified inbox as identity-linking source of truth and fail-closed ambiguity"
+    },
+    {
+      "id": "auth0-account-linking",
+      "url": "https://auth0.com/docs/manage-users/user-accounts/user-account-linking",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "Stronger re-authentication precaution when linking distinct credentials"
+    },
+    {
+      "id": "skills-sh-docs",
+      "url": "https://www.skills.sh/docs",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "GitHub skill installation and badge contract"
+    },
+    {
+      "id": "skills-sh-api",
+      "url": "https://www.skills.sh/docs/api",
+      "kind": "official",
+      "version": "live documentation",
+      "use": "Catalog identity, install URL, and public skill page metadata"
+    },
+    {
+      "id": "agentspawn-local",
+      "url": "local-git:agentspawn",
+      "kind": "local-reference",
+      "version": "commit ea6b1ab1ea9cd20305f014a24f32cfeb7c326e25",
+      "use": "Single-use claim, 0600 local auth file, bounded telemetry, and explicit consent patterns"
+    },
+    {
+      "id": "apostl-agent-api",
+      "url": "https://platform.apostl.dev/api/v1/agent",
+      "kind": "product-contract",
+      "version": "v1",
+      "use": "Registration, scoped key, balance, preview, project, workflow, run, status, and report discovery"
+    }
+  ],
+  "identity_policy": "Require mailbox activation or a positively provider-verified email. Fail closed on missing, unverified, ambiguous, or provider-mismatched email. For manual linking of distinct credentials, require authenticated control of the existing account as the stronger Auth0-style precaution."
+}

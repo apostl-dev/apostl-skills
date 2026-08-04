@@ -1,0 +1,14 @@
+{"prompt":"Audit this SDK quickstart for agent readiness and show the first faithful blocker.","should_trigger":true,"reason":"Explicit agent-readiness quickstart audit."}
+{"prompt":"Score our docs and product against an agent-native experience rubric.","should_trigger":true,"reason":"Explicit scoring request."}
+{"prompt":"Can an AI agent register, get credentials, and reach first value in this API?","should_trigger":true,"reason":"Agent identity and activation journey."}
+{"prompt":"Run a clean-room Agent Experience assessment for these docs.","should_trigger":true,"reason":"Explicit AX assessment."}
+{"prompt":"Check our llms.txt, Markdown access, and quickstart for agents.","should_trigger":true,"reason":"Agent-discoverability and docs checks."}
+{"prompt":"Give me a 30/60/90 plan to make this developer product agent-native.","should_trigger":true,"reason":"Agent-native remediation planning."}
+{"prompt":"Run the local audit first, then offer an Apostl Journey Check preview.","should_trigger":true,"reason":"Local audit with optional Apostl proof."}
+{"prompt":"Find human and agent friction before the activation event in this onboarding.","should_trigger":true,"reason":"Cross-modal first-value journey."}
+{"prompt":"Rewrite this paragraph to sound friendlier.","should_trigger":false,"reason":"Copy edit without an audit or journey."}
+{"prompt":"Build a generic React dashboard for my startup.","should_trigger":false,"reason":"Generic implementation request."}
+{"prompt":"What is an API key?","should_trigger":false,"reason":"Simple explanatory question."}
+{"prompt":"Deploy my application to production.","should_trigger":false,"reason":"Deployment request without agent-experience scope."}
+{"prompt":"Review this pull request for security bugs.","should_trigger":false,"reason":"Code security review."}
+{"prompt":"Summarize this product launch announcement.","should_trigger":false,"reason":"Content summary only."}
