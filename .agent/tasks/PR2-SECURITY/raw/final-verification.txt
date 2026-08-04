@@ -1,0 +1,17 @@
+Final current-tree verification summary
+
+npm test: PASS, 8/8
+npm run test:agent-native: PASS, 27 Python and 5/5 Node
+focused collector tests: PASS, 10/10
+routing evaluation: PASS, 14/14
+synthesis evaluation: PASS, 5/5
+quick_validate: PASS, Skill is valid
+skillify: PASS, properly skilled 9/11; optional check-resolvable JSON EOF advisory
+npx skills list: PASS
+git diff --check: PASS
+Python compilation: PASS
+high-confidence secret-pattern scan: PASS, no matches
+urllib connection-path scan: PASS, no matches
+W3Schools sample: PASS, HTTP 200, 9 responses, 4 artifacts
+W3Schools full overflow: PASS, 127 eligible, downgraded to sample with limitation
+independent forward verifier: PASS

@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
@@ -39,6 +40,38 @@ class FakeFetcher:
         )
 
 
+class FakeSocket:
+    def __init__(self, response_bytes):
+        self.response_bytes = response_bytes
+        self.connected_to = None
+        self.sent = b""
+        self.timeout = None
+
+    def settimeout(self, timeout):
+        self.timeout = timeout
+
+    def connect(self, address):
+        self.connected_to = address
+
+    def sendall(self, data):
+        self.sent += data
+
+    def makefile(self, *_args, **_kwargs):
+        return io.BytesIO(self.response_bytes)
+
+    def close(self):
+        return None
+
+
+class FakeTlsContext:
+    def __init__(self):
+        self.server_hostname = None
+
+    def wrap_socket(self, sock, *, server_hostname):
+        self.server_hostname = server_hostname
+        return sock
+
+
 class CollectEvidenceTest(unittest.TestCase):
     def setUp(self):
         self.collector = load_module("agent_native_collect_evidence", "scripts/collect_evidence.py")
@@ -77,6 +110,149 @@ class CollectEvidenceTest(unittest.TestCase):
         ):
             with self.subTest(unsafe=unsafe), self.assertRaises(self.collector.UnsafeTargetError):
                 self.collector.validate_public_url(unsafe, resolver=public_resolver)
+
+    def test_initial_url_rejects_every_query_and_never_echoes_credential_values(self):
+        public_resolver = lambda *_args, **_kwargs: [
+            (2, 1, 6, "", ("93.184.216.34", 443)),
+        ]
+        unsafe_urls = (
+            "https://example.com/docs?sig=secret-sig-value",
+            "https://example.com/docs?signature=secret-signature-value",
+            "https://example.com/docs?auth=secret-auth-value",
+            "https://example.com/docs?authorization=secret-authorization-value",
+            "https://example.com/docs?credential=secret-credential-value",
+            "https://example.com/docs?X-Amz-Signature=secret-amz-value",
+            "https://example.com/docs?ordinary=still-not-persisted",
+            "https://example.com/docs?",
+            "https://secret-user:secret-password@example.com/docs",
+        )
+
+        for unsafe in unsafe_urls:
+            secret = unsafe.split("=", 1)[-1] if "=" in unsafe else "secret-password"
+            with self.subTest(unsafe=unsafe):
+                with self.assertRaises(self.collector.UnsafeTargetError) as raised:
+                    self.collector.validate_public_url(unsafe, resolver=public_resolver)
+                self.assertNotIn(secret, str(raised.exception))
+
+        artifact_secret = "initial-artifact-secret"
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory) / "must-not-exist"
+            with self.assertRaises(self.collector.UnsafeTargetError) as raised:
+                self.collector.run_collection(
+                    output_dir=output_dir,
+                    target_url=f"https://example.com/docs?authorization={artifact_secret}",
+                    journey_name="Read docs",
+                    activation_event="Docs understood",
+                    target_agent="new coding agent",
+                    mode="sample",
+                    max_pages=10,
+                    fetcher=FakeFetcher(self.collector, {}),
+                )
+            self.assertNotIn(artifact_secret, str(raised.exception))
+            self.assertFalse(output_dir.exists(), "blocked initial URLs must not create evidence artifacts")
+
+    def test_redirect_with_query_secret_is_rejected_before_request_or_persistence(self):
+        secret = "redirect-secret-value"
+        response = (
+            b"HTTP/1.1 302 Found\r\n"
+            b"Location: https://example.com/next?X-Amz-Signature=" + secret.encode() + b"\r\n"
+            b"Content-Length: 0\r\n\r\n"
+        )
+        sockets = []
+
+        def socket_factory(*_args):
+            sock = FakeSocket(response)
+            sockets.append(sock)
+            return sock
+
+        fetcher = self.collector.SafeFetcher(
+            self.collector.CollectionLimits(max_requests=4),
+            resolver=lambda *_args, **_kwargs: [(2, 1, 6, "", ("93.184.216.34", 443))],
+            socket_factory=socket_factory,
+            ssl_context_factory=FakeTlsContext,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory) / "must-not-exist"
+            with self.assertRaises(self.collector.UnsafeTargetError) as raised:
+                self.collector.run_collection(
+                    output_dir=output_dir,
+                    target_url="https://example.com/start",
+                    journey_name="Read docs",
+                    activation_event="Docs understood",
+                    target_agent="new coding agent",
+                    mode="sample",
+                    max_pages=10,
+                    fetcher=fetcher,
+                )
+            self.assertFalse(output_dir.exists(), "blocked redirects must not create evidence artifacts")
+
+        self.assertNotIn(secret, str(raised.exception))
+        self.assertEqual(1, len(sockets), "unsafe redirect must not trigger another request")
+        self.assertNotIn(secret.encode(), sockets[0].sent)
+
+    def test_redirect_with_empty_query_marker_is_rejected_before_second_request(self):
+        response = b"HTTP/1.1 302 Found\r\nLocation: /next?\r\nContent-Length: 0\r\n\r\n"
+        sockets = []
+
+        def socket_factory(*_args):
+            sock = FakeSocket(response)
+            sockets.append(sock)
+            return sock
+
+        fetcher = self.collector.SafeFetcher(
+            self.collector.CollectionLimits(max_requests=4),
+            resolver=lambda *_args, **_kwargs: [(2, 1, 6, "", ("93.184.216.34", 443))],
+            socket_factory=socket_factory,
+            ssl_context_factory=FakeTlsContext,
+        )
+
+        with self.assertRaises(self.collector.UnsafeTargetError):
+            fetcher.fetch("https://example.com/start")
+        self.assertEqual(1, len(sockets), "an empty query marker must be rejected before a second request")
+
+    def test_https_connects_to_once_validated_public_ip_and_preserves_tls_hostname(self):
+        resolver_calls = []
+
+        def rebinding_resolver(*args, **kwargs):
+            resolver_calls.append((args, kwargs))
+            address = "93.184.216.34" if len(resolver_calls) == 1 else "127.0.0.1"
+            return [(2, 1, 6, "", (address, 443))]
+
+        fake_socket = FakeSocket(
+            b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK"
+        )
+        tls_context = FakeTlsContext()
+        fetcher = self.collector.SafeFetcher(
+            self.collector.CollectionLimits(max_requests=2),
+            resolver=rebinding_resolver,
+            socket_factory=lambda *_args: fake_socket,
+            ssl_context_factory=lambda: tls_context,
+        )
+
+        result = fetcher.fetch("https://example.com/docs")
+
+        self.assertEqual(200, result.status)
+        self.assertEqual(1, len(resolver_calls), "the connect path must not resolve the hostname again")
+        self.assertEqual(("93.184.216.34", 443), fake_socket.connected_to)
+        self.assertEqual("example.com", tls_context.server_hostname)
+        self.assertIn(b"Host: example.com\r\n", fake_socket.sent)
+        self.assertEqual("93.184.216.34", result.connected_ip)
+
+    def test_discovered_query_and_userinfo_links_are_never_persisted(self):
+        links = self.collector._absolute_links(
+            "https://example.com/docs/",
+            [
+                "/docs/safe",
+                "/docs/private?authorization=do-not-store-this",
+                "/docs/empty?",
+                "https://user:password@example.com/docs/private",
+            ],
+        )
+
+        self.assertEqual(["https://example.com/docs/safe"], links)
+        self.assertNotIn("do-not-store-this", json.dumps(links))
+        self.assertNotIn("password", json.dumps(links))
 
     def test_request_budget_is_hard_bounded(self):
         budget = self.collector.RequestBudget(2)

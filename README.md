@@ -101,11 +101,14 @@ python3 skills/agent-native-experience/scripts/collect_evidence.py \
 
 The command writes `raw-evidence.json`, `evidence.json`, `report.md`, and
 `report.json`. It uses only the Python standard library, performs GET-only
-public-doc checks, rejects private/local/credential-bearing targets, disables
-environment proxies, and enforces request, redirect, response-size, timeout,
-and page limits. Raw response bodies are not persisted. Static collection does
-not prove activation; enrich `evidence.json` with the real agent trace and
-rerun `audit.py` after executing the selected journey.
+public-doc checks, rejects URL userinfo and every query string, validates public
+DNS, connects directly to the validated numeric IP while preserving the HTTP
+Host and HTTPS certificate hostname, disables environment proxies, and enforces
+request, redirect, response-size, timeout, and page limits. The same URL rules
+apply to redirects and discovered corpus links. Raw response bodies are not
+persisted. Static collection does not prove activation; enrich `evidence.json`
+with the real agent trace and rerun `audit.py` after executing the selected
+journey.
 
 Inputs are the target URL, selected journey, activation event, and environment.
 Optional inputs include a repository or OpenAPI spec, frozen corpus inventory,

@@ -5,18 +5,18 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import ipaddress
 import json
 import re
 import socket
+import ssl
 import sys
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Callable
-from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qsl, urljoin, urlsplit, urlunsplit
-from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
 
@@ -25,14 +25,15 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
 import audit  # noqa: E402
-from safety import is_sensitive_key, sanitize_data  # noqa: E402
+from safety import sanitize_data  # noqa: E402
 
 
 SKILL_ROOT = SCRIPT_ROOT.parent
 RUBRIC_PATH = SKILL_ROOT / "references" / "rubric.v1.json"
 SOURCES_PATH = SKILL_ROOT / "references" / "sources.v1.json"
 COLLECTOR_VERSION = "agent-native-evidence-collector.v1.0.1"
-SAFE_RESPONSE_HEADERS = {"cache-control", "content-type", "etag", "expires", "last-modified", "location"}
+SAFE_RESPONSE_HEADERS = {"cache-control", "content-type", "etag", "expires", "last-modified"}
+REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 DOC_CHECK_IDS = {
     item["id"] for item in json.loads(RUBRIC_PATH.read_text(encoding="utf-8"))["criteria"]
     if item["category"] == "Docs"
@@ -90,6 +91,25 @@ class CollectionLimits:
         }
 
 
+class ResolvedTarget:
+    def __init__(self, url: str, scheme: str, hostname: str, port: int, addresses: list[str]):
+        self.url = url
+        self.scheme = scheme
+        self.hostname = hostname
+        self.port = port
+        self.addresses = tuple(addresses)
+
+    @property
+    def request_target(self) -> str:
+        return quote(urlsplit(self.url).path or "/", safe="/%:@!$&'()*+,;=-._~")
+
+    @property
+    def host_header(self) -> str:
+        host = f"[{self.hostname}]" if ":" in self.hostname else self.hostname
+        default_port = 443 if self.scheme == "https" else 80
+        return host if self.port == default_port else f"{host}:{self.port}"
+
+
 class FetchResult:
     def __init__(
         self,
@@ -101,6 +121,7 @@ class FetchResult:
         redirect_chain: list[str],
         error: str | None = None,
         truncated: bool = False,
+        connected_ip: str | None = None,
     ):
         self.requested_url = requested_url
         self.final_url = final_url
@@ -110,6 +131,7 @@ class FetchResult:
         self.redirect_chain = list(redirect_chain)
         self.error = error
         self.truncated = truncated
+        self.connected_ip = connected_ip
 
     def metadata(self, accept: str | None = None) -> dict[str, Any]:
         return {
@@ -121,6 +143,7 @@ class FetchResult:
             "bytes_captured": len(self.body),
             "body_sha256": hashlib.sha256(self.body).hexdigest(),
             "redirect_chain": self.redirect_chain,
+            "connected_ip": self.connected_ip,
             "truncated": self.truncated,
             "error": self.error,
         }
@@ -133,7 +156,7 @@ def _resolved_addresses(hostname: str, port: int, resolver: Callable[..., Any]) 
         raise UnsafeTargetError(f"target host did not resolve: {hostname}") from exc
 
 
-def validate_public_url(value: str, resolver: Callable[..., Any] = socket.getaddrinfo) -> str:
+def _normalize_http_url(value: str) -> tuple[str, str, str, int]:
     raw = str(value).strip()
     try:
         parsed = urlsplit(raw)
@@ -145,12 +168,32 @@ def validate_public_url(value: str, resolver: Callable[..., Any] = socket.getadd
     if not parsed.hostname:
         raise UnsafeTargetError("target URL must include a host")
     if parsed.username is not None or parsed.password is not None:
-        raise UnsafeTargetError("target URL must not contain credentials")
-    if any(is_sensitive_key(key) for key, _value in parse_qsl(parsed.query, keep_blank_values=True)):
-        raise UnsafeTargetError("target URL must not contain secret-shaped query parameters")
+        raise UnsafeTargetError("target URL must not contain userinfo")
+    if "?" in raw:
+        raise UnsafeTargetError("target URL must not contain a query string")
+    if parsed.fragment:
+        raise UnsafeTargetError("target URL must not contain a fragment")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in raw):
+        raise UnsafeTargetError("target URL contains invalid control characters")
     hostname = parsed.hostname.rstrip(".").lower()
     if hostname == "localhost" or hostname.endswith((".localhost", ".local", ".internal")):
         raise UnsafeTargetError("local and internal hostnames are not allowed")
+    try:
+        hostname = hostname.encode("idna").decode("ascii")
+    except UnicodeError as exc:
+        raise UnsafeTargetError("target URL contains an invalid host") from exc
+    host_netloc = f"[{hostname}]" if ":" in hostname else hostname
+    netloc = host_netloc
+    default_port = 443 if parsed.scheme.lower() == "https" else 80
+    if parsed.port and parsed.port != default_port:
+        netloc = f"{host_netloc}:{parsed.port}"
+    path = quote(parsed.path or "/", safe="/%:@!$&'()*+,;=-._~")
+    normalized = urlunsplit((parsed.scheme.lower(), netloc, path, "", ""))
+    return normalized, parsed.scheme.lower(), hostname, port
+
+
+def resolve_public_target(value: str, resolver: Callable[..., Any] = socket.getaddrinfo) -> ResolvedTarget:
+    normalized, scheme, hostname, port = _normalize_http_url(value)
     try:
         literal = ipaddress.ip_address(hostname)
         addresses = [str(literal)]
@@ -158,68 +201,134 @@ def validate_public_url(value: str, resolver: Callable[..., Any] = socket.getadd
         addresses = _resolved_addresses(hostname, port, resolver)
     if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
         raise UnsafeTargetError("target must resolve only to globally routable addresses")
-    host_netloc = f"[{hostname}]" if ":" in hostname else hostname
-    netloc = host_netloc
-    default_port = 443 if parsed.scheme.lower() == "https" else 80
-    if parsed.port and parsed.port != default_port:
-        netloc = f"{host_netloc}:{parsed.port}"
-    path = parsed.path or "/"
-    return urlunsplit((parsed.scheme.lower(), netloc, path, parsed.query, ""))
+    return ResolvedTarget(normalized, scheme, hostname, port, addresses)
 
 
-class _BoundedRedirectHandler(HTTPRedirectHandler):
-    def __init__(self, validator: Callable[[str], str], maximum: int):
-        super().__init__()
-        self.validator = validator
-        self.maximum = maximum
-        self.chain: list[str] = []
+def validate_public_url(value: str, resolver: Callable[..., Any] = socket.getaddrinfo) -> str:
+    return resolve_public_target(value, resolver=resolver).url
 
-    def reset(self) -> None:
-        self.chain = []
 
-    def redirect_request(self, request, fp, code, msg, headers, newurl):  # noqa: ANN001
-        if len(self.chain) >= self.maximum:
-            raise CollectionLimitError(f"redirect limit exhausted at {self.maximum}")
-        validated = self.validator(newurl)
-        self.chain.append(validated)
-        return super().redirect_request(request, fp, code, msg, headers, validated)
+def _safe_url_reference(value: str) -> str:
+    original = str(value)
+    raw = original.strip()
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in original):
+        raise UnsafeTargetError("URL reference contains invalid control characters")
+    if "?" in raw:
+        raise UnsafeTargetError("URL reference must not contain a query string")
+    if "#" in raw:
+        raise UnsafeTargetError("URL reference must not contain a fragment")
+    try:
+        parsed = urlsplit(raw)
+    except ValueError as exc:
+        raise UnsafeTargetError("URL reference is malformed") from exc
+    if parsed.username is not None or parsed.password is not None:
+        raise UnsafeTargetError("URL reference must not contain userinfo")
+    return raw
 
 
 class SafeFetcher:
-    def __init__(self, limits: CollectionLimits | None = None):
+    def __init__(
+        self,
+        limits: CollectionLimits | None = None,
+        *,
+        resolver: Callable[..., Any] = socket.getaddrinfo,
+        socket_factory: Callable[..., Any] = socket.socket,
+        ssl_context_factory: Callable[[], Any] = ssl.create_default_context,
+    ):
         self.limits = limits or CollectionLimits()
         self.budget = RequestBudget(self.limits.max_requests)
-        self.redirects = _BoundedRedirectHandler(validate_public_url, self.limits.max_redirects)
-        self.opener = build_opener(ProxyHandler({}), self.redirects)
+        self.resolver = resolver
+        self.socket_factory = socket_factory
+        self.ssl_context_factory = ssl_context_factory
 
-    def _read(self, response) -> tuple[bytes, bool]:  # noqa: ANN001
+    def _read(self, response: http.client.HTTPResponse) -> tuple[bytes, bool]:
         body = response.read(self.limits.max_bytes + 1)
         return body[: self.limits.max_bytes], len(body) > self.limits.max_bytes
 
-    def fetch(self, url: str, accept: str | None = None) -> FetchResult:
-        self.budget.take()
-        validated = validate_public_url(url)
-        self.redirects.reset()
-        request = Request(
-            validated,
-            headers={
-                "Accept": accept or "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
-                "User-Agent": "apostl-agent-native-experience/1.0.1",
-            },
-            method="GET",
-        )
+    def _open_socket(self, target: ResolvedTarget) -> tuple[Any, str]:
+        address = target.addresses[0]
+        family = socket.AF_INET6 if ipaddress.ip_address(address).version == 6 else socket.AF_INET
+        sock = self.socket_factory(family, socket.SOCK_STREAM)
         try:
-            with self.opener.open(request, timeout=self.limits.timeout_seconds) as response:
+            sock.settimeout(self.limits.timeout_seconds)
+            connect_address = (address, target.port, 0, 0) if family == socket.AF_INET6 else (address, target.port)
+            sock.connect(connect_address)
+            if target.scheme == "https":
+                sock = self.ssl_context_factory().wrap_socket(sock, server_hostname=target.hostname)
+            return sock, address
+        except Exception:
+            sock.close()
+            raise
+
+    def _request_once(self, target: ResolvedTarget, accept: str | None) -> tuple[int, dict[str, str], str | None, bytes, bool, str]:
+        chosen_accept = accept or "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1"
+        if "\r" in chosen_accept or "\n" in chosen_accept:
+            raise ValueError("accept header contains invalid control characters")
+        sock, connected_ip = self._open_socket(target)
+        try:
+            request = (
+                f"GET {target.request_target} HTTP/1.1\r\n"
+                f"Host: {target.host_header}\r\n"
+                f"Accept: {chosen_accept}\r\n"
+                "User-Agent: apostl-agent-native-experience/1.0.1\r\n"
+                "Connection: close\r\n\r\n"
+            ).encode("ascii")
+            sock.sendall(request)
+            response = http.client.HTTPResponse(sock, method="GET")
+            response.begin()
+            try:
                 body, truncated = self._read(response)
-                final_url = validate_public_url(response.geturl())
-                headers = {key.lower(): value for key, value in response.headers.items() if key.lower() in SAFE_RESPONSE_HEADERS}
-                return FetchResult(validated, final_url, response.status, headers, body, self.redirects.chain, truncated=truncated)
-        except HTTPError as exc:
-            body, truncated = self._read(exc)
-            headers = {key.lower(): value for key, value in exc.headers.items() if key.lower() in SAFE_RESPONSE_HEADERS}
-            return FetchResult(validated, exc.geturl(), exc.code, headers, body, self.redirects.chain, error=str(exc.reason), truncated=truncated)
-        except URLError as exc:
-            return FetchResult(validated, validated, 0, {}, b"", self.redirects.chain, error=str(exc.reason))
+                headers = {
+                    key.lower(): value
+                    for key, value in response.getheaders()
+                    if key.lower() in SAFE_RESPONSE_HEADERS
+                }
+                location = response.getheader("Location")
+                return response.status, headers, location, body, truncated, connected_ip
+            finally:
+                response.close()
+        finally:
+            sock.close()
+
+    def fetch(self, url: str, accept: str | None = None) -> FetchResult:
+        target = resolve_public_target(url, resolver=self.resolver)
+        requested_url = target.url
+        redirect_chain: list[str] = []
+        while True:
+            self.budget.take()
+            try:
+                status, headers, location, body, truncated, connected_ip = self._request_once(target, accept)
+            except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
+                return FetchResult(
+                    requested_url,
+                    target.url,
+                    0,
+                    {},
+                    b"",
+                    redirect_chain,
+                    error=f"network request failed ({type(exc).__name__})",
+                )
+            if status in REDIRECT_STATUSES and location:
+                if len(redirect_chain) >= self.limits.max_redirects:
+                    raise CollectionLimitError(f"redirect limit exhausted at {self.limits.max_redirects}")
+                target = resolve_public_target(
+                    urljoin(target.url, _safe_url_reference(location)),
+                    resolver=self.resolver,
+                )
+                redirect_chain.append(target.url)
+                continue
+            error = None if 200 <= status < 400 else f"HTTP {status}"
+            return FetchResult(
+                requested_url,
+                target.url,
+                status,
+                headers,
+                body,
+                redirect_chain,
+                error=error,
+                truncated=truncated,
+                connected_ip=connected_ip,
+            )
 
 
 class _DocumentParser(HTMLParser):
@@ -309,14 +418,15 @@ def _markdown_like(response: FetchResult) -> bool:
 
 
 def _canonical(value: str) -> str:
-    parsed = urlsplit(value)
+    normalized, _scheme, _hostname, _port = _normalize_http_url(value)
+    parsed = urlsplit(normalized)
     path = parsed.path or "/"
     if path != "/":
         path = path.rstrip("/")
     netloc = (parsed.hostname or "").lower()
     if parsed.port and not ((parsed.scheme == "https" and parsed.port == 443) or (parsed.scheme == "http" and parsed.port == 80)):
         netloc = f"{netloc}:{parsed.port}"
-    return urlunsplit((parsed.scheme.lower(), netloc, path, parsed.query, ""))
+    return urlunsplit((parsed.scheme.lower(), netloc, path, "", ""))
 
 
 def _same_origin(first: str, second: str) -> bool:
@@ -327,10 +437,13 @@ def _same_origin(first: str, second: str) -> bool:
 def _absolute_links(base_url: str, values: list[str]) -> list[str]:
     links = []
     for value in values:
-        absolute = urljoin(base_url, value.strip())
-        parsed = urlsplit(absolute)
-        if parsed.scheme in {"http", "https"} and parsed.hostname and _same_origin(base_url, absolute):
-            links.append(_canonical(absolute))
+        try:
+            absolute = urljoin(base_url, _safe_url_reference(value))
+            canonical = _canonical(absolute)
+        except (UnsafeTargetError, ValueError):
+            continue
+        if _same_origin(base_url, canonical):
+            links.append(canonical)
     return sorted(set(links))
 
 
@@ -483,7 +596,7 @@ def collect_evidence(
         "The collector performs bounded static public-doc checks only; it does not execute the selected activation journey.",
         "Product criteria remain unknown until product/API evidence is supplied; human evidence remains not_run.",
         "Raw response bodies are analyzed in memory but not written to disk; raw metadata retains safe headers, hashes, byte counts, redirects, status, and truncation state.",
-        "Public DNS is validated before each request and redirect, but DNS rebinding cannot be fully eliminated by the Python standard-library HTTP stack.",
+        "Each request connects to the first validated public address without retrying alternate addresses; a transient failure on that address can block collection.",
         "The bundled source registry is versioned but not refreshed automatically; refresh drift-prone guidance before calling it current.",
     ]
 
@@ -797,7 +910,7 @@ def main() -> int:
     parser.add_argument("--max-redirects", type=int, default=4)
     args = parser.parse_args()
     try:
-        validated = validate_public_url(args.url)
+        validated = _canonical(args.url)
         limits = CollectionLimits(args.max_requests, args.max_bytes, args.timeout_seconds, args.max_redirects)
         outputs = run_collection(
             output_dir=args.output_dir,

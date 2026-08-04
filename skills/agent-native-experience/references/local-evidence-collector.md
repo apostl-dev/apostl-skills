@@ -42,9 +42,18 @@ The collector performs signed-out `GET` requests only. It rejects:
 
 - schemes other than HTTP or HTTPS;
 - usernames or passwords embedded in URLs;
+- every query string, including signed, authenticated, and ordinary query
+  parameters;
 - localhost, `.local`, `.internal`, loopback, private, link-local, reserved,
   multicast, and otherwise non-global IP addresses;
-- redirects to those targets.
+- redirects to those targets or to URLs with userinfo/query strings.
+
+The rule also excludes discovered HTML, sitemap, and llms.txt links with
+userinfo or query strings before corpus or raw metadata is created. Each
+request resolves its hostname once, validates every answer, and connects the
+TCP socket directly to a validated public numeric IP. HTTPS still verifies the
+certificate and sends SNI for the original hostname; HTTP sends the original
+Host header. The connect path does not perform a second hostname resolution.
 
 It disables environment HTTP proxies and records only a safe response-header
 allowlist. Defaults and hard caps are:
@@ -84,8 +93,7 @@ measurements are not confused with native AFDocs output.
 - Product/API criteria remain `unknown` until supplied or executed evidence is
   added; the collector does not mark them `not_applicable` on the user's behalf.
 - Human Frictions remain `not_run` until a human completes the journey.
-- Public DNS is checked before each request and redirect, but the Python
-  standard-library HTTP stack cannot fully pin DNS against rebinding between
-  validation and connection.
+- A request uses the first validated public address and does not retry alternate
+  addresses, so a transient failure on that address can block collection.
 - Drift-prone rubric sources are not refreshed automatically. Refresh them
   before describing guidance as current.

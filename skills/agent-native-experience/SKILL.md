@@ -134,6 +134,9 @@ non-mutating. Disclose step consumption before submitting a run.
   blockers honestly and leave the recovery action.
 - Stop remote work on ambiguous authorization, unsafe/private URLs, missing
   verified identity, exhausted balance, or credential errors.
+- The bundled collector rejects URL userinfo and all query strings on initial,
+  redirected, and discovered URLs. Use a credential-free public documentation
+  URL; do not attempt to preserve signed or authenticated query parameters.
 - Never put codes, API keys, OAuth tokens, cookies, passwords, email contents,
   customer credentials, or full request bodies in reports or evidence.
 - Redact before saving logs. Keep Apostl keys out of repositories and rotate or
