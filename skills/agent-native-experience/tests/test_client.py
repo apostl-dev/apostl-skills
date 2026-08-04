@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 import stat
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -67,6 +68,29 @@ class ClientTest(unittest.TestCase):
         fake.create_project({"source_url": "https://example.com/docs"}, confirmed=True,
                             idempotency_key="project-1")
         self.assertEqual("project-1", calls[-1][3]["Idempotency-Key"])
+
+    def test_mutating_calls_require_stable_idempotency_keys(self):
+        fake = self.client.ApostlClient(
+            "https://platform.apostl.dev/api/v1",
+            api_key="1|token",
+            transport=lambda *_args: {"data": {"ok": True}},
+        )
+
+        for call in (
+            lambda: fake.create_project({"source_url": "https://example.com"}, confirmed=True),
+            lambda: fake.create_workflow(1, {"journey_url": "https://example.com"}, confirmed=True),
+            lambda: fake.start_run(1, confirmed=True),
+        ):
+            with self.assertRaises(ValueError):
+                call()
+
+    def test_cli_exposes_preview_project_workflow_run_and_bounded_poll(self):
+        parser = self.client.build_parser()
+        commands = parser._subparsers._group_actions[0].choices
+        self.assertTrue({"preview", "project", "workflow", "run", "poll"}.issubset(commands))
+
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["project", "--source-url", "https://example.com/docs"])
 
     def test_http_errors_keep_machine_code_and_actionable_recovery_without_secret(self):
         def transport(*_args):

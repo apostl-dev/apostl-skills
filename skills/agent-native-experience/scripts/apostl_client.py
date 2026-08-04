@@ -13,11 +13,19 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, Callable
+import sys
+
+
+SCRIPT_ROOT = Path(__file__).resolve().parent
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
+from safety import redact_text, sanitize_data  # noqa: E402
 
 
 DEFAULT_BASE_URL = "https://platform.apostl.dev/api/v1"
 DEFAULT_CREDENTIALS = Path.home() / ".config" / "apostl" / "credentials.json"
-TOKEN_PATTERN = re.compile(r"\b\d+\|[A-Za-z0-9_-]{12,}\b")
+IDEMPOTENCY_PATTERN = re.compile(r"\A[A-Za-z0-9._:-]{1,120}\Z")
 
 
 class ConfirmationRequired(RuntimeError):
@@ -33,7 +41,7 @@ class ApiError(RuntimeError):
 
 
 def redact(value: str) -> str:
-    return TOKEN_PATTERN.sub("[REDACTED]", value)
+    return redact_text(value)
 
 
 def save_credentials(path: Path, api_key: str, api_base: str) -> None:
@@ -96,14 +104,17 @@ class ApostlClient:
 
     def create_project(self, payload: dict[str, Any], *, confirmed: bool, idempotency_key: str | None = None) -> dict[str, Any]:
         self._confirm(confirmed)
+        self._idempotency_key(idempotency_key)
         return self._request("POST", "/agent/projects", payload, idempotency_key=idempotency_key)
 
     def create_workflow(self, project_id: int, payload: dict[str, Any], *, confirmed: bool, idempotency_key: str | None = None) -> dict[str, Any]:
         self._confirm(confirmed)
+        self._idempotency_key(idempotency_key)
         return self._request("POST", f"/agent/projects/{project_id}/workflows", payload, idempotency_key=idempotency_key)
 
     def start_run(self, workflow_id: int, *, confirmed: bool, idempotency_key: str | None = None) -> dict[str, Any]:
         self._confirm(confirmed)
+        self._idempotency_key(idempotency_key)
         return self._request("POST", f"/agent/workflows/{workflow_id}/runs", {"confirmed": True}, idempotency_key=idempotency_key)
 
     def run_status(self, run_id: int) -> dict[str, Any]:
@@ -148,6 +159,11 @@ class ApostlClient:
         if not confirmed:
             raise ConfirmationRequired("Preview the mutation and obtain explicit user confirmation first.")
 
+    def _idempotency_key(self, value: str | None) -> str:
+        if not isinstance(value, str) or IDEMPOTENCY_PATTERN.fullmatch(value) is None:
+            raise ValueError("A stable idempotency key using letters, numbers, dot, underscore, colon, or dash is required.")
+        return value
+
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None,
                  *, authenticated: bool = True, idempotency_key: str | None = None) -> dict[str, Any]:
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
@@ -187,7 +203,7 @@ def _client(args: argparse.Namespace) -> ApostlClient:
     return ApostlClient(credentials.get("api_base", args.base_url), credentials.get("api_key"))
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--credentials", type=Path, default=DEFAULT_CREDENTIALS)
@@ -200,7 +216,71 @@ def main() -> int:
     activation.add_argument("--code", required=True)
     for name in ("me", "balance", "rotate", "revoke"):
         commands.add_parser(name)
-    args = parser.parse_args()
+
+    preview = commands.add_parser("preview")
+    _add_journey_arguments(preview, include_source=True)
+
+    project = commands.add_parser("project")
+    project.add_argument("--source-url", required=True)
+    project.add_argument("--name")
+    project.add_argument("--description")
+    _add_mutation_arguments(project)
+
+    workflow = commands.add_parser("workflow")
+    workflow.add_argument("--project-id", required=True, type=int)
+    _add_journey_arguments(workflow, include_source=False)
+    workflow.add_argument("--name")
+    workflow.add_argument("--description")
+    _add_mutation_arguments(workflow)
+
+    run = commands.add_parser("run")
+    run.add_argument("--workflow-id", required=True, type=int)
+    _add_mutation_arguments(run)
+
+    poll = commands.add_parser("poll")
+    poll.add_argument("--run-id", required=True, type=int)
+    poll.add_argument("--interval-seconds", type=_bounded_float(0, 60), default=5)
+    poll.add_argument("--max-attempts", type=_bounded_int(1, 600), default=120)
+    return parser
+
+
+def _add_journey_arguments(parser: argparse.ArgumentParser, *, include_source: bool) -> None:
+    if include_source:
+        parser.add_argument("--source-url", required=True)
+    parser.add_argument("--journey-url", required=True)
+    parser.add_argument("--expected-activation", required=True)
+    parser.add_argument("--run-mode", choices=("external_strict", "partner_self_healing"), required=True)
+
+
+def _add_mutation_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--confirm", action="store_true", required=True)
+    parser.add_argument("--idempotency-key", required=True)
+
+
+def _bounded_int(minimum: int, maximum: int):
+    def parse(value: str) -> int:
+        parsed = int(value)
+        if not minimum <= parsed <= maximum:
+            raise argparse.ArgumentTypeError(f"must be between {minimum} and {maximum}")
+        return parsed
+    return parse
+
+
+def _bounded_float(minimum: float, maximum: float):
+    def parse(value: str) -> float:
+        parsed = float(value)
+        if not minimum <= parsed <= maximum:
+            raise argparse.ArgumentTypeError(f"must be between {minimum} and {maximum}")
+        return parsed
+    return parse
+
+
+def _compact_payload(**values: Any) -> dict[str, Any]:
+    return {key: value for key, value in values.items() if value is not None}
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     client = _client(args)
     if args.command == "register":
         result = client.request_registration(args.agent_name, args.email)
@@ -210,12 +290,37 @@ def main() -> int:
         result = client.me()
     elif args.command == "balance":
         result = client.balance()
+    elif args.command == "preview":
+        result = client.preview(_compact_payload(
+            source_url=args.source_url, journey_url=args.journey_url,
+            expected_activation=args.expected_activation, run_mode=args.run_mode,
+        ))
+    elif args.command == "project":
+        result = client.create_project(
+            _compact_payload(source_url=args.source_url, name=args.name, description=args.description),
+            confirmed=args.confirm, idempotency_key=args.idempotency_key,
+        )
+    elif args.command == "workflow":
+        result = client.create_workflow(
+            args.project_id,
+            _compact_payload(journey_url=args.journey_url, expected_activation=args.expected_activation,
+                             run_mode=args.run_mode, name=args.name, description=args.description),
+            confirmed=args.confirm, idempotency_key=args.idempotency_key,
+        )
+    elif args.command == "run":
+        result = client.start_run(
+            args.workflow_id, confirmed=args.confirm, idempotency_key=args.idempotency_key,
+        )
+    elif args.command == "poll":
+        result = client.poll_run(
+            args.run_id, interval_seconds=args.interval_seconds, max_attempts=args.max_attempts,
+        )
     elif args.command == "rotate":
         result = client.rotate(args.credentials)
     else:
         client.revoke(args.credentials)
         result = {"status": "revoked"}
-    print(json.dumps(result, indent=2, sort_keys=True))
+    print(json.dumps(sanitize_data(result, reject_keys=False), indent=2, sort_keys=True))
     return 0
 
 

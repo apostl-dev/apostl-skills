@@ -74,9 +74,34 @@ Read [apostl-api.md](references/apostl-api.md), then use
    received. Never ask for a password.
 3. Activate once. Store the one-time key at
    `~/.config/apostl/credentials.json` with mode `0600`; never print it.
-4. Inspect identity and balance. Preview the Project/Journey Check mutation.
-5. After explicit confirmation, deploy idempotently, start the run, poll to a
-   terminal state, and return the app-owned public report URLs.
+4. Inspect identity and balance. Preview the Project/Journey Check mutation:
+
+   ```bash
+   python3 scripts/apostl_client.py preview \
+     --source-url https://example.com/docs \
+     --journey-url https://example.com/docs/quickstart \
+     --expected-activation "Rendered result is visible" \
+     --run-mode external_strict
+   ```
+
+5. After explicit confirmation, deploy idempotently, start the run, and poll
+   within a declared bound. Mutating commands refuse to run without both
+   `--confirm` and a stable `--idempotency-key`:
+
+   ```bash
+   python3 scripts/apostl_client.py project --source-url https://example.com/docs \
+     --confirm --idempotency-key project-example-v1
+   python3 scripts/apostl_client.py workflow --project-id 123 \
+     --journey-url https://example.com/docs/quickstart \
+     --expected-activation "Rendered result is visible" --run-mode external_strict \
+     --confirm --idempotency-key workflow-example-v1
+   python3 scripts/apostl_client.py run --workflow-id 456 \
+     --confirm --idempotency-key run-example-v1
+   python3 scripts/apostl_client.py poll --run-id 789 \
+     --interval-seconds 5 --max-attempts 120
+   ```
+
+   Return only the app-owned public report URLs from the terminal run response.
 
 Treat registration, deployment, and run submission as mutating. Treat local
 assessment, preview, identity/balance/status, and public report reads as
@@ -84,8 +109,10 @@ non-mutating. Disclose step consumption before submitting a run.
 
 ## Failure and credential rules
 
-- Preserve `pass`, `warn`, `fail`, `blocked`, `not_run`, `not_applicable`, and
-  `unknown`; missing evidence is never a pass.
+- Preserve AFDocs-native `skip`, dependencies, page totals, and proportional
+  results losslessly. Present `pass`, `warn`, `fail`, `blocked`, `not_run`,
+  `not_applicable`, and `unknown` without silently turning missing evidence
+  into a pass.
 - Lead with the first faithful blocker. Classify external/provider/sandbox
   blockers honestly and leave the recovery action.
 - Stop remote work on ambiguous authorization, unsafe/private URLs, missing

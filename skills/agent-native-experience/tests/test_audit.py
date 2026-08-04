@@ -88,6 +88,97 @@ class AuditTest(unittest.TestCase):
         self.assertEqual({"discovered": 3, "eligible": 2, "attempted": 1, "passed": 1,
                           "failed": 0, "blocked": 0, "not_run": 1, "excluded": 1}, first["counts"])
 
+    def test_corpus_is_canonicalized_deduplicated_and_retains_provenance(self):
+        rows = [
+            {"url": "HTTPS://EXAMPLE.COM:443/docs/#one", "status": "passed",
+             "source": "sitemap", "content_hash": "a" * 64,
+             "redirect_chain": ["https://example.com/old", "https://example.com/docs/"],
+             "auth_gate": "none"},
+            {"url": "https://example.com/docs#two", "status": "passed",
+             "source": "llms.txt", "content_hash": "a" * 64,
+             "exclusion_reason": None},
+        ]
+
+        corpus = self.audit.corpus_accounting("full", rows)
+
+        self.assertEqual(1, corpus["counts"]["discovered"])
+        row = corpus["rows"][0]
+        self.assertEqual("https://example.com/docs", row["url"])
+        self.assertEqual(["llms.txt", "sitemap"], row["sources"])
+        self.assertEqual(2, len(row["original_urls"]))
+        self.assertEqual("none", row["auth_gate"])
+        self.assertEqual(2, len(row["redirect_chain"]))
+
+    def test_afdocs_skip_dependencies_and_proportional_scoring_are_lossless(self):
+        evidence = {
+            "checks": {
+                "llms-txt-exists": {"status": "fail", "evidence": "404"},
+                "llms-txt-valid": {"status": "pass", "evidence": "not executable"},
+                "rendering-strategy": {
+                    "status": "warn", "proportion": 0.75,
+                    "passed": 3, "total": 4, "evidence": "three of four pages",
+                },
+                "section-header-quality": {"status": "skip", "evidence": "upstream skipped"},
+            },
+            "agent_journey": {"status": "not_run", "activation_reached": False},
+            "human_journey": {"status": "not_run"},
+            "corpus": {"mode": "sample", "rows": []},
+        }
+
+        report = self.audit.build_report(self.rubric, evidence)
+
+        dependent = report["results"]["llms-txt-valid"]
+        self.assertEqual("skip", dependent["status"])
+        self.assertEqual(["llms-txt-exists"], dependent["unmet_dependencies"])
+        proportional = report["results"]["rendering-strategy"]
+        self.assertEqual(0.75, proportional["proportion"])
+        self.assertEqual(3, proportional["passed"])
+        self.assertEqual(4, proportional["total"])
+        self.assertEqual("skip", report["results"]["section-header-quality"]["status"])
+
+        lower_evidence = json.loads(json.dumps(evidence))
+        lower_evidence["checks"]["rendering-strategy"]["proportion"] = 0.25
+        lower = self.audit.build_report(self.rubric, lower_evidence)
+        self.assertGreater(report["score"]["categories"]["Docs"], lower["score"]["categories"]["Docs"])
+
+    def test_human_modes_render_all_required_friction_fields_and_not_run(self):
+        base = {
+            "checks": {}, "agent_journey": {"status": "not_run", "activation_reached": False},
+            "corpus": {"mode": "sample", "rows": []}, "frictions": [],
+        }
+        selected = self.audit.build_report(self.rubric, {**base, "human_journey": {
+            "mode": "selected", "selected_guide": "Install guide", "status": "blocked",
+            "frictions": [{"step": "Install", "observation": "Command fails", "severity": "high",
+                           "evidence": "exit 1", "smallest_fix": "Correct the package name"}],
+        }})
+        markdown = self.audit.render_markdown(selected)
+        self.assertIn("Mode: selected", markdown)
+        self.assertIn("Selected guide: Install guide", markdown)
+        self.assertIn("Severity: high", markdown)
+        self.assertIn("Evidence: exit 1", markdown)
+
+        primary = self.audit.build_report(self.rubric, {**base, "human_journey": {"status": "not_run"}})
+        primary_markdown = self.audit.render_markdown(primary)
+        self.assertIn("Mode: primary", primary_markdown)
+        self.assertIn("Next action:", primary_markdown)
+
+    def test_report_outputs_redact_secret_shaped_text_and_reject_secret_fields(self):
+        evidence = {
+            "checks": {}, "agent_journey": {"status": "not_run", "activation_reached": False},
+            "human_journey": {"status": "not_run"}, "corpus": {"mode": "sample", "rows": []},
+            "frictions": [{"id": "F-1", "evidence": "api_key=123|apostl_secret_value"}],
+        }
+        report = self.audit.build_report(self.rubric, evidence)
+        rendered = self.audit.render_markdown(report)
+        serialized = json.dumps(report)
+        self.assertNotIn("apostl_secret_value", rendered)
+        self.assertNotIn("apostl_secret_value", serialized)
+        self.assertIn("[REDACTED]", rendered)
+
+        evidence["frictions"][0]["api_key"] = "123|apostl_secret_value"
+        with self.assertRaises(self.audit.SensitiveOutputError):
+            self.audit.build_report(self.rubric, evidence)
+
     def test_report_contains_decision_ready_sections_and_visible_rice_assumptions(self):
         evidence = {
             "journey": {"name": "Quickstart", "target": "agent", "activation_event": "hello rendered"},

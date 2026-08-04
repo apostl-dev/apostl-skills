@@ -20,6 +20,10 @@ Base: `https://platform.apostl.dev/api/v1`.
 - `GET /agent/runs/{id}` — poll status and discover app-owned public HTML,
   Markdown, events, proof-manifest, and PDF URLs.
 
+The CLI exposes `preview`, `project`, `workflow`, `run`, and `poll`. Project,
+workflow, and run commands require `--confirm` plus `--idempotency-key`; poll
+requires a bounded `--max-attempts` (1-600) and interval (0-60 seconds).
+
 Use `agent:read`, `agent:deploy`, and `agent:keys` scopes. Never use an agent key
 on operator import/cancel routes. Treat machine-readable `error.code` and
 `error.recovery` as the retry contract. Do not send secrets in metadata,

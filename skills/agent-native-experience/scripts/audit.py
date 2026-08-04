@@ -6,8 +6,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+
+SCRIPT_ROOT = Path(__file__).resolve().parent
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
+from safety import SensitiveOutputError, sanitize_data  # noqa: E402
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -27,8 +36,68 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def canonicalize_url(value: str) -> str:
+    parsed = urlsplit(value.strip())
+    scheme = parsed.scheme.lower()
+    hostname = (parsed.hostname or "").lower()
+    port = parsed.port
+    if port and not ((scheme == "https" and port == 443) or (scheme == "http" and port == 80)):
+        hostname = f"{hostname}:{port}"
+    path = parsed.path or "/"
+    if path != "/":
+        path = path.rstrip("/")
+    query = urlencode(sorted(parse_qsl(parsed.query, keep_blank_values=True)))
+    return urlunsplit((scheme, hostname, path, query, ""))
+
+
+def normalize_corpus(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for supplied in rows:
+        if not isinstance(supplied, dict) or not str(supplied.get("url", "")).strip():
+            continue
+        row = dict(supplied)
+        row["original_url"] = str(row["url"])
+        row["url"] = canonicalize_url(str(row["url"]))
+        grouped.setdefault(row["url"], []).append(row)
+
+    status_priority = {"failed": 0, "blocked": 1, "not_run": 2, "passed": 3, "not_applicable": 4, "excluded": 5}
+    normalized = []
+    for url, duplicates in grouped.items():
+        ordered_duplicates = sorted(
+            duplicates,
+            key=lambda row: (status_priority.get(str(row.get("status")), 99), json.dumps(row, sort_keys=True)),
+        )
+        row = dict(ordered_duplicates[0])
+        row["url"] = url
+        row["original_urls"] = sorted({str(item.get("original_url", item.get("url", ""))) for item in duplicates})
+        row.pop("original_url", None)
+        sources = set()
+        redirects = []
+        hashes = set()
+        for item in duplicates:
+            source = item.get("source")
+            if isinstance(source, list):
+                sources.update(str(value) for value in source)
+            elif source:
+                sources.add(str(source))
+            for redirect in item.get("redirect_chain", []) if isinstance(item.get("redirect_chain"), list) else []:
+                if str(redirect) not in redirects:
+                    redirects.append(str(redirect))
+            if item.get("content_hash"):
+                hashes.add(str(item["content_hash"]))
+            for field in ("auth_gate", "exclusion_reason", "reason", "blocker"):
+                if not row.get(field) and item.get(field):
+                    row[field] = item[field]
+        row["sources"] = sorted(sources)
+        row["redirect_chain"] = redirects
+        if len(hashes) > 1:
+            row["content_hashes"] = sorted(hashes)
+        normalized.append(row)
+    return sorted(normalized, key=lambda row: (str(row.get("url", "")), str(row.get("status", ""))))
+
+
 def corpus_accounting(mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
-    ordered = sorted(rows, key=lambda row: (str(row.get("url", "")), str(row.get("status", ""))))
+    ordered = normalize_corpus(rows)
     counts = {
         "discovered": len(ordered),
         "eligible": sum(row.get("status") not in {"excluded", "not_applicable"} for row in ordered),
@@ -58,7 +127,7 @@ def corpus_accounting(mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _status_score(status: str) -> float | None:
-    if status == "not_applicable":
+    if status in {"not_applicable", "skip"}:
         return None
     return STATUS_COEFFICIENT.get(status, 0.0)
 
@@ -68,7 +137,9 @@ def _weighted_score(criteria: list[dict[str, Any]], results: dict[str, dict[str,
     denominator = 0.0
     for criterion in criteria:
         result = results[criterion["id"]]
-        coefficient = _status_score(result["status"])
+        coefficient = result.get("proportion")
+        if coefficient is None:
+            coefficient = _status_score(result["status"])
         if coefficient is None:
             continue
         weight = float(criterion["weight"])
@@ -101,6 +172,7 @@ def _rice(friction: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+    evidence = sanitize_data(evidence, reject_keys=True)
     supplied = evidence.get("checks") if isinstance(evidence.get("checks"), dict) else {}
     results: dict[str, dict[str, Any]] = {}
     for criterion in rubric["criteria"]:
@@ -108,10 +180,30 @@ def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, 
         status = item.get("status", "unknown") if isinstance(item, dict) else "unknown"
         if status not in rubric["allowed_statuses"]:
             status = "unknown"
+        proportion = item.get("proportion") if isinstance(item, dict) else None
+        passed = item.get("passed") if isinstance(item, dict) else None
+        total = item.get("total") if isinstance(item, dict) else None
+        if proportion is None and isinstance(passed, (int, float)) and isinstance(total, (int, float)) and total > 0:
+            proportion = passed / total
+        if not isinstance(proportion, (int, float)) or not 0 <= float(proportion) <= 1:
+            proportion = None
+        unmet_dependencies = []
+        if criterion["id"] in supplied and status != "skip":
+            for expression in criterion.get("dependencies", []):
+                alternatives = str(expression).split("|")
+                if not any(results.get(dependency, {}).get("status") in {"pass", "warn"} for dependency in alternatives):
+                    unmet_dependencies.append(str(expression))
+            if unmet_dependencies:
+                status = "skip"
+                proportion = None
         results[criterion["id"]] = {
             "status": status,
             "evidence": item.get("evidence") if isinstance(item, dict) else None,
             "note": item.get("note") if isinstance(item, dict) else None,
+            "proportion": float(proportion) if proportion is not None else None,
+            "passed": passed,
+            "total": total,
+            "unmet_dependencies": unmet_dependencies,
         }
 
     by_category = {
@@ -120,6 +212,7 @@ def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, 
     }
     agent_journey = evidence.get("agent_journey") if isinstance(evidence.get("agent_journey"), dict) else {}
     human_journey = evidence.get("human_journey") if isinstance(evidence.get("human_journey"), dict) else {}
+    human_journey = {"mode": "primary", **human_journey}
     category_scores = {
         "Docs": _weighted_score(by_category["Docs"], results),
         "Product": _weighted_score(by_category["Product"], results),
@@ -163,7 +256,7 @@ def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, 
     accounting = corpus_accounting(str(corpus.get("mode", "sample")), corpus.get("rows", []))
     journey = evidence.get("journey") if isinstance(evidence.get("journey"), dict) else {}
 
-    return {
+    return sanitize_data({
         "report_version": "agent-native-experience-report.v1",
         "rubric_version": rubric["rubric_version"],
         "executive_verdict": {"status": verdict_status, "blocker": blocker or None},
@@ -179,7 +272,7 @@ def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, 
         "provenance": evidence.get("provenance", []),
         "limitations": evidence.get("limitations", ["Unexecuted checks remain unknown or not_run."]),
         "public_artifacts": evidence.get("public_artifacts", []),
-    }
+    }, reject_keys=True)
 
 
 def _value(value: Any) -> str:
@@ -243,15 +336,25 @@ def render_markdown(report: dict[str, Any]) -> str:
     for step in report["agent_journey"].get("steps", []):
         lines.append(f"- {_value(step.get('source_step'))}: {_value(step.get('observation'))} (deviation: {_value(step.get('deviation'))})")
 
-    lines += ["", "## Human Frictions", "", f"Human journey status: **{report['human_journey'].get('status', 'not_run')}**"]
+    lines += [
+        "", "## Human Frictions", "",
+        f"- Mode: {report['human_journey'].get('mode', 'primary')}",
+        f"- Selected guide: {_value(report['human_journey'].get('selected_guide'))}",
+        f"- Status: **{report['human_journey'].get('status', 'not_run')}**",
+    ]
     if report["human_journey"].get("status", "not_run") == "not_run":
         lines.append(f"- Next action: {_value(report['human_journey'].get('next_action') or 'Have one representative human complete the same journey and record pre-activation observations.')}")
     for item in report["human_journey"].get("frictions", []):
-        lines.append(f"- {_value(item.get('step'))}: {_value(item.get('observation'))} — {_value(item.get('smallest_fix'))}")
+        lines += [
+            f"- {_value(item.get('step'))}: {_value(item.get('observation'))}",
+            f"  - Severity: {_value(item.get('severity'))}",
+            f"  - Evidence: {_value(item.get('evidence'))}",
+            f"  - Smallest fix: {_value(item.get('smallest_fix'))}",
+        ]
 
-    lines += ["", "## Guide-by-guide coverage", "", "| URL | Terminal status | Blocker or exclusion | Content hash |", "| --- | --- | --- | --- |"]
+    lines += ["", "## Guide-by-guide coverage", "", "| URL | Sources | Redirects | Auth gate | Terminal status | Blocker or exclusion | Content hash |", "| --- | --- | --- | --- | --- | --- | --- |"]
     for row in report["corpus"]["rows"]:
-        lines.append(f"| {_value(row.get('url'))} | {_value(row.get('status'))} | {_value(row.get('blocker') or row.get('reason'))} | {_value(row.get('content_hash'))} |")
+        lines.append(f"| {_value(row.get('url'))} | {_value(', '.join(row.get('sources', [])))} | {_value(' -> '.join(row.get('redirect_chain', [])))} | {_value(row.get('auth_gate'))} | {_value(row.get('status'))} | {_value(row.get('blocker') or row.get('exclusion_reason') or row.get('reason'))} | {_value(row.get('content_hash'))} |")
 
     lines += ["", "## Deduplicated friction evidence", ""]
     for friction in report["frictions"]:

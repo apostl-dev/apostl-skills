@@ -2,11 +2,13 @@
   "rubric_version": "agent-native-experience.v1",
   "formula": {
     "status_coefficients": {"pass": 1, "warn": 0.5, "fail": 0, "blocked": 0, "not_run": 0, "unknown": 0},
+    "proportional_results": "When AFDocs supplies a page-level passed/total ratio, use that exact 0..1 proportion instead of a fixed status coefficient.",
+    "skip": "AFDocs checks skipped because dependencies did not pass are preserved as skip and excluded from the denominator.",
     "not_applicable": "excluded from the denominator only with a recorded safety reason",
     "category_weights": {"Docs": 40, "Product": 30, "Agent Journey": 20, "Human Journey": 10},
     "perfect_score_gate": "All required criteria pass and both selected journeys have current activation evidence."
   },
-  "allowed_statuses": ["pass", "warn", "fail", "blocked", "not_run", "not_applicable", "unknown"],
+  "allowed_statuses": ["pass", "warn", "fail", "blocked", "skip", "not_run", "not_applicable", "unknown"],
   "criteria": [
     {"id":"llms-txt-exists","category":"Docs","source":"afdocs-checks","weight":10,"required":true,"dependencies":[],"result_semantics":{"pass":"canonical llms.txt reachable","warn":"alternate or cross-host index only","fail":"no usable index"},"evidence_method":"Fetch canonical candidates and record status, URL, and hash.","fix_guidance":"Publish a canonical root llms.txt index."},
     {"id":"llms-txt-valid","category":"Docs","source":"afdocs-checks","weight":4,"required":true,"dependencies":["llms-txt-exists"],"result_semantics":{"pass":"valid parseable index","warn":"minor structural issues","fail":"invalid index"},"evidence_method":"Parse the complete index.","fix_guidance":"Use valid llms.txt structure and absolute discoverable links."},
