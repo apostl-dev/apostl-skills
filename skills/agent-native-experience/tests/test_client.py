@@ -73,7 +73,7 @@ class ClientTest(unittest.TestCase):
         payload = {
             "agent_name": "Codex local agent",
             "skill_name": "agent-native-experience",
-            "skill_version": "1.1.0",
+            "skill_version": "1.1.1",
             "device_name": "Codex local agent",
             "client_instance_id": "83e765c7-cc57-47b6-b7a6-8f59a8ab032a",
             "requested_scopes": ["agent:read", "agent:deploy", "agent:keys"],
@@ -104,6 +104,10 @@ class ClientTest(unittest.TestCase):
         self.assertEqual("/agent/authorizations", calls[0][1])
         self.assertEqual(payload, calls[0][2])
         self.assertNotIn("Authorization", calls[0][3])
+        self.assertEqual(
+            "Apostl-Agent-Native-Experience/1.1.1 (+https://platform.apostl.dev)",
+            calls[0][3]["User-Agent"],
+        )
 
     def test_authorize_refuses_to_replace_a_pending_transaction(self):
         with tempfile.TemporaryDirectory() as directory:
