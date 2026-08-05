@@ -79,19 +79,45 @@ score into activation proof.
 
 ## Optional Apostl proof
 
-Local assessment requires no account. Before any remote mutation, show the
-exact preview, one-step reservation, URLs, expected activation, run mode, and
-idempotency keys; obtain explicit user confirmation.
+Keep local and platform authorization separate. Local assessment and authorized
+local fixes require no Apostl account and make zero Apostl mutation calls: do
+not upload files/evidence, launch an agent, consume steps, or infer platform
+consent from an existing credential. Offer platform mode; enter it only after
+the user explicitly asks. Before a deploy, run, or feedback mutation, show the
+exact local preview and obtain confirmation for that payload.
 
 Read [apostl-api.md](references/apostl-api.md), then use
 `scripts/apostl_client.py`:
 
-1. Ask for the exact human-supplied email and agent name.
-2. Request registration. Pause and ask only for the six-digit code the human
-   received. Never ask for a password.
-3. Activate once. Store the one-time key at
-   `~/.config/apostl/credentials.json` with mode `0600`; never print it.
-4. Inspect identity and balance. Preview the Project/Journey Check mutation:
+1. Prepare the intended docs/journey action, then start the Apostl-owned link
+   flow. The command prints only the verification URL and expiry:
+
+   ```bash
+   python3 scripts/apostl_client.py authorize \
+     --agent-name "Codex local agent" --device-name "Codex local agent" \
+     --source-url https://example.com/docs \
+     --journey-url https://example.com/docs/quickstart \
+     --expected-activation "Rendered result is visible" \
+     --run-mode external_strict
+   ```
+
+2. Ask the human to open only that Apostl URL. They register or sign in with
+   email, GitHub, or Google on Apostl and approve or deny the shown skill,
+   scopes, workspace, intended action, feedback behavior, and expiry. Never ask
+   for an OAuth token, password, activation code, or pasted API key.
+3. Poll only Apostl. `wait-authorization` obeys `Retry-After`, bounded backoff,
+   and the transaction deadline. It stores the one-time key directly in
+   `~/.config/apostl/credentials.json` with mode `0600` without printing it:
+
+   ```bash
+   python3 scripts/apostl_client.py wait-authorization --max-wait-seconds 900
+   ```
+
+   On interruption, rerun the same command to resume. Use
+   `cancel-authorization` to delete the local pending secret; this makes no
+   platform mutation and the server transaction expires closed. Email plus
+   code remains a deprecated platform-controlled fallback only.
+4. Inspect identity and 100-step balance. Preview the Project/Journey Check:
 
    ```bash
    python3 scripts/apostl_client.py preview \
@@ -119,9 +145,24 @@ Read [apostl-api.md](references/apostl-api.md), then use
    ```
 
    Return only the app-owned public report URLs from the terminal run response.
+6. For later feedback, preview the minimized payload locally, then submit it
+   only after payload-level approval. Never attach local files, diffs,
+   transcripts, or diagnostics:
 
-Treat registration, deployment, and run submission as mutating. Treat local
-assessment, preview, identity/balance/status, and public report reads as
+   ```bash
+   python3 scripts/apostl_client.py feedback-preview \
+     --target-type run --target-public-id run_public_id \
+     --kind correction --message "Use the rendered activation signal"
+   python3 scripts/apostl_client.py feedback-submit \
+     --target-type run --target-public-id run_public_id \
+     --kind correction --message "Use the rendered activation signal" \
+     --confirm --idempotency-key feedback-run-v1
+   python3 scripts/apostl_client.py feedback-list --limit 50
+   ```
+
+Treat authorization creation, deployment, run submission, and feedback writes
+as platform mutations. Treat local assessment/fixes, local previews,
+identity/balance/status, feedback reads, and public report reads as
 non-mutating. Disclose step consumption before submitting a run.
 
 ## Failure and credential rules
@@ -143,3 +184,6 @@ non-mutating. Disclose step consumption before submitting a run.
   revoke a key suspected of exposure.
 - Apostl owns reports and artifacts. Do not call a runner directly or create a
   second report server.
+- GitHub is source distribution only. Authorization, runs, tracking, and
+  feedback go through Apostl; the runner image and registry stay inside the
+  Apostl production perimeter and are never a public skill dependency.

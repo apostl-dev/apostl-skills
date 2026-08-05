@@ -92,7 +92,7 @@
       "url": "https://platform.apostl.dev/api/v1/agent",
       "kind": "product-contract",
       "version": "v1",
-      "use": "Registration, scoped key, balance, preview, project, workflow, run, status, and report discovery"
+      "use": "Apostl-owned link authorization, one-time scoped key handoff, balance, preview, project, workflow, run, status, feedback, and report discovery; GitHub is distribution only and the runner image remains inside the production perimeter"
     }
   ],
   "identity_policy": "Require mailbox activation or a positively provider-verified email. Fail closed on missing, unverified, ambiguous, or provider-mismatched email. For manual linking of distinct credentials, require authenticated control of the existing account as the stronger Auth0-style precaution."

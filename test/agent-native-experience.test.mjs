@@ -53,3 +53,22 @@ test('repository resolver and README expose the public skill journey', () => {
   assert.match(readme, /\[example public report\]\(https:\/\/platform\.apostl\.dev\/reports\/[0-9a-f-]+\)/u);
   assert.doesNotMatch(readme, /github\.com\/apostl-dev\/apostl-app/u);
 });
+
+test('skill and README preserve the local boundary and Apostl-owned link flow', () => {
+  const skill = readFileSync(resolve(repoRoot, 'skills/agent-native-experience/SKILL.md'), 'utf8');
+  const readme = readFileSync(resolve(repoRoot, 'README.md'), 'utf8');
+  const api = readFileSync(resolve(
+    repoRoot, 'skills/agent-native-experience/references/apostl-api.md',
+  ), 'utf8');
+  const combined = `${skill}\n${readme}`;
+
+  assert.match(combined, /authorize[\s\S]*wait-authorization/iu);
+  assert.match(combined, /local[^\n]*(?:zero|no) Apostl|no Apostl account/iu);
+  assert.match(combined, /GitHub[^\n]*(?:distribution|source)/iu);
+  assert.match(combined, /(?:runner|image)[^\n]*(?:inside|internal|production perimeter)/iu);
+  assert.match(combined, /feedback/iu);
+  assert.match(api, /POST `?\/agent\/authorizations`?/u);
+  assert.match(api, /POST `?\/agent\/authorizations\/token`?/u);
+  assert.match(api, /GET\|POST `?\/agent\/feedback`?/u);
+  assert.doesNotMatch(combined, /Registration uses email plus a human-supplied six-digit code/iu);
+});
