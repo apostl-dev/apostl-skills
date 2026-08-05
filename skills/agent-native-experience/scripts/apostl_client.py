@@ -31,7 +31,8 @@ DEFAULT_CREDENTIALS = Path.home() / ".config" / "apostl" / "credentials.json"
 DEFAULT_PENDING_AUTHORIZATION = Path.home() / ".config" / "apostl" / "authorization.json"
 DEFAULT_SCOPES = ("agent:read", "agent:deploy", "agent:keys", "agent:feedback")
 SKILL_NAME = "agent-native-experience"
-SKILL_VERSION = "1.1.0"
+SKILL_VERSION = "1.1.1"
+USER_AGENT = f"Apostl-Agent-Native-Experience/{SKILL_VERSION} (+https://platform.apostl.dev)"
 IDEMPOTENCY_PATTERN = re.compile(r"\A[A-Za-z0-9._:-]{1,120}\Z")
 MAX_AUTHORIZATION_INTERVAL_SECONDS = 60.0
 FEEDBACK_TARGET_TYPES = {"project", "workflow", "run", "report", "recommendation"}
@@ -475,7 +476,11 @@ class ApostlClient:
 
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None,
                  *, authenticated: bool = True, idempotency_key: str | None = None) -> dict[str, Any]:
-        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
+        }
         if authenticated:
             if not self.api_key:
                 raise ApiError(401, "credentials_missing", "Authorize or load ~/.config/apostl/credentials.json", "No API key")
