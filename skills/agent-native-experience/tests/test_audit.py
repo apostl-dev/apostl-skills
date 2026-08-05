@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +74,22 @@ class AuditTest(unittest.TestCase):
         self.assertEqual("blocked", report["executive_verdict"]["status"])
         self.assertIn("Credential was required", report["executive_verdict"]["blocker"])
         self.assertIn("Human Journey", report["score"]["categories"])
+
+    def test_local_report_build_makes_zero_apostl_or_other_network_calls(self):
+        evidence = {
+            "journey": {"name": "Local docs review", "target": "coding agent",
+                        "activation_event": "local result observed"},
+            "checks": {},
+            "agent_journey": {"status": "not_run", "activation_reached": False},
+            "human_journey": {"status": "not_run"},
+            "corpus": {"mode": "sample", "rows": []},
+            "frictions": [],
+        }
+        with patch("urllib.request.urlopen", side_effect=AssertionError("local mode must not call a platform")) as network:
+            report = self.audit.build_report(self.rubric, evidence)
+
+        network.assert_not_called()
+        self.assertEqual("not_run", report["agent_journey"]["status"])
 
     def test_full_corpus_accounting_is_honest_and_deterministic(self):
         rows = [

@@ -59,12 +59,11 @@ Use $agent-native-experience to audit this product's documented quickstart,
 identify the first faithful blocker, and give me a 30/60/90 improvement plan.
 ```
 
-The local audit needs no Apostl account. It produces a deterministic Markdown
-and JSON report and keeps missing evidence as `unknown` or `not_run`. With your
-explicit confirmation, the skill can optionally register through the Apostl
-Agent API, preview a Project and Journey Check, start one evidence-backed run,
-and return the app-owned report URLs. It never prints the one-time API key and
-stores credentials with mode `0600`.
+The local audit needs no Apostl account and makes no Apostl mutation calls. It
+produces a deterministic Markdown and JSON report and keeps missing evidence as
+`unknown` or `not_run`. Local file fixes require their own ordinary approval;
+they do not authorize uploads, agent runs, steps, or feedback. Platform mode is
+optional and starts only when the user asks for an Apostl authorization link.
 
 The report includes:
 
@@ -133,12 +132,43 @@ Next action: Correct the install command, then rerun in a fresh directory
 
 #### Optional Apostl-powered proof
 
-Registration uses email plus a human-supplied six-digit code—never a password.
-Activation returns a scoped API key once and the existing 100-step first-proof
-grant once. The skill previews the exact Project and Journey Check, step impact,
-URLs, and idempotency keys before asking for confirmation. Only after approval
-does it create those canonical resources and submit a run. Apostl, not the
-runner, owns the public HTML, Markdown, events, proof manifest, and PDF URLs.
+Start platform mode with an Apostl-owned link:
+
+```bash
+python3 skills/agent-native-experience/scripts/apostl_client.py authorize \
+  --agent-name "Codex local agent" --device-name "Codex local agent" \
+  --source-url https://example.com/docs \
+  --journey-url https://example.com/docs/quickstart \
+  --expected-activation "Rendered result is visible" \
+  --run-mode external_strict
+python3 skills/agent-native-experience/scripts/apostl_client.py \
+  wait-authorization --max-wait-seconds 900
+```
+
+The first command prints only an Apostl verification URL and expiry. The human
+opens it and registers or signs in with email, GitHub, or Google on Apostl,
+reviews the requesting skill/device, scopes, workspace, intended journey,
+feedback behavior, and expiry, then approves or denies. The polling command
+talks only to Apostl, obeys `Retry-After` and a hard deadline, and stores the
+one-time API key at `~/.config/apostl/credentials.json` with mode `0600` without
+printing it. Email plus code is deprecated fallback-only behavior.
+
+Approval connects the skill and exposes identity, scope, workspace, and the
+existing exactly-once 100-step first-proof grant. It does not authorize a run.
+The skill still previews the exact Project/Journey Check, step impact, URLs,
+and idempotency keys and asks for explicit confirmation before deploy/run.
+Apostl owns run tracking plus public HTML, Markdown, events, proof manifest,
+and PDF URLs.
+
+Feedback follows the same boundary: `feedback-preview` is local;
+`feedback-submit` requires `--confirm` and an idempotency key; `feedback-list`
+is a scoped read with a maximum page size of 50 and an optional nonnegative
+integer cursor. The client accepts only a small structured payload and never
+uploads local files, diffs, transcripts, or diagnostics.
+
+GitHub is source distribution only. Authorization, runs, tracking, and feedback
+go through Apostl. The production runner image and registry stay inside the
+Apostl production perimeter; public GHCR is not a launch dependency.
 
 Privacy rules are strict: do not supply customer secrets in target fields; codes,
 keys, tokens, cookies, email contents, and environment values are excluded from

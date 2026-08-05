@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -113,4 +113,78 @@ test('mocked Apostl preview-to-terminal-report CLI path is confirmed, idempotent
     ['project-e2e', 'workflow-e2e', 'run-e2e'],
   );
   assert.ok(calls.every((call) => !call.body.includes('synthetic_test_token')));
+});
+
+test('mocked Apostl link authorization stores pending and one-time credentials without stdout secrets', async (t) => {
+  const runDir = join(repoRoot, '.tmp', 'agent-native-experience-link-auth-e2e');
+  rmSync(runDir, { recursive: true, force: true });
+  mkdirSync(runDir, { recursive: true });
+  const credentials = join(runDir, 'credentials.json');
+  const authorization = join(runDir, 'authorization.json');
+  const deviceCode = 'opaque-device-code-e2e';
+  const apiKey = '123|apostl_e2e_one_time_secret';
+  const calls = [];
+
+  const server = createServer((request, response) => {
+    let body = '';
+    request.on('data', (chunk) => { body += chunk; });
+    request.on('end', () => {
+      const payload = body ? JSON.parse(body) : {};
+      calls.push({ method: request.method, path: request.url, payload });
+      const { port } = server.address();
+      let status;
+      let data;
+      if (request.url === '/api/v1/agent/authorizations') {
+        status = 202;
+        data = {
+          authorization_request_id: 'authorization-e2e',
+          device_code: deviceCode,
+          verification_uri_complete: `http://127.0.0.1:${port}/agent/authorize/browser-token`,
+          expires_at: '2099-08-05T04:15:00Z', expires_in: 600, interval: 5, status: 'pending',
+        };
+      } else if (request.url === '/api/v1/agent/authorizations/token') {
+        status = 201;
+        data = {
+          status: 'consumed', api_key: apiKey, api_key_prefix: '123|apos',
+          api_key_created_at: '2026-08-05T04:10:00Z', client_id: 'client-e2e',
+          identity: { id: 1 }, workspace: { id: 2 },
+          scopes: ['agent:read', 'agent:deploy', 'agent:keys', 'agent:feedback'],
+          balance: { available: 100, reserved: 0 },
+        };
+      } else {
+        response.writeHead(404); response.end(); return;
+      }
+      response.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      response.end(JSON.stringify({ data }));
+    });
+  });
+  await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen));
+  t.after(() => server.close());
+  const { port } = server.address();
+  const globalArgs = [
+    '--base-url', `http://127.0.0.1:${port}/api/v1`,
+    '--credentials', credentials, '--authorization', authorization,
+  ];
+  const authorized = await runClient([...globalArgs, 'authorize',
+    '--agent-name', 'Codex local agent', '--device-name', 'Codex local agent',
+    '--source-url', 'https://www.w3schools.com/',
+    '--journey-url', 'https://www.w3schools.com/html/html_intro.asp',
+    '--expected-activation', 'Observe the rendered heading and paragraph.',
+    '--run-mode', 'external_strict']);
+  assert.equal(authorized.status, 0, `${authorized.stdout}\n${authorized.stderr}`);
+  assert.match(authorized.stdout, /verification_url/u);
+  assert.doesNotMatch(authorized.stdout + authorized.stderr, new RegExp(deviceCode, 'u'));
+  assert.equal(statSync(authorization).mode & 0o777, 0o600);
+
+  const redeemed = await runClient([...globalArgs, 'wait-authorization', '--max-wait-seconds', '30']);
+  assert.equal(redeemed.status, 0, `${redeemed.stdout}\n${redeemed.stderr}`);
+  assert.doesNotMatch(redeemed.stdout + redeemed.stderr, new RegExp(apiKey.replace('|', '\\|'), 'u'));
+  assert.doesNotMatch(redeemed.stdout + redeemed.stderr, new RegExp(deviceCode, 'u'));
+  assert.equal(statSync(credentials).mode & 0o777, 0o600);
+  assert.equal(JSON.parse(readFileSync(credentials, 'utf8')).api_key, apiKey);
+  assert.deepEqual(calls.map((call) => call.path), [
+    '/api/v1/agent/authorizations', '/api/v1/agent/authorizations/token',
+  ]);
+  assert.ok(calls[0].payload.requested_scopes.includes('agent:feedback'));
+  assert.equal(calls[1].payload.device_code, deviceCode);
 });
