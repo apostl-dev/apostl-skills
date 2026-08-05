@@ -31,7 +31,7 @@ DEFAULT_CREDENTIALS = Path.home() / ".config" / "apostl" / "credentials.json"
 DEFAULT_PENDING_AUTHORIZATION = Path.home() / ".config" / "apostl" / "authorization.json"
 DEFAULT_SCOPES = ("agent:read", "agent:deploy", "agent:keys", "agent:feedback")
 SKILL_NAME = "agent-native-experience"
-SKILL_VERSION = "1.1.1"
+SKILL_VERSION = "1.1.2"
 USER_AGENT = f"Apostl-Agent-Native-Experience/{SKILL_VERSION} (+https://platform.apostl.dev)"
 IDEMPOTENCY_PATTERN = re.compile(r"\A[A-Za-z0-9._:-]{1,120}\Z")
 MAX_AUTHORIZATION_INTERVAL_SECONDS = 60.0
@@ -225,7 +225,7 @@ class ApostlClient:
             try:
                 response = self.transport(
                     "POST", "/agent/authorizations/token", {"device_code": device_code},
-                    {"Accept": "application/json", "Content-Type": "application/json"},
+                    self._request_headers(),
                 )
             except ApiError as error:
                 action = self._authorization_error_action(error.code, pending_path)
@@ -373,11 +373,7 @@ class ApostlClient:
             query.append(("cursor", cursor))
         query.append(("limit", limit))
         path = "/agent/feedback?" + urllib.parse.urlencode(query)
-        response = self.transport("GET", path, None, {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
-        })
+        response = self.transport("GET", path, None, self._request_headers(authenticated=True))
         data = response.get("data") if isinstance(response, dict) else None
         if isinstance(data, dict):
             items = data.get("items", [])
@@ -476,6 +472,15 @@ class ApostlClient:
 
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None,
                  *, authenticated: bool = True, idempotency_key: str | None = None) -> dict[str, Any]:
+        headers = self._request_headers(authenticated=authenticated, idempotency_key=idempotency_key)
+        response = self.transport(method, path, payload, headers)
+        data = response.get("data", response)
+        if not isinstance(data, dict):
+            raise ApiError(502, "invalid_response", "Retry and inspect the API status", "Response data was not an object")
+        return data
+
+    def _request_headers(self, *, authenticated: bool = False,
+                         idempotency_key: str | None = None) -> dict[str, str]:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -487,11 +492,7 @@ class ApostlClient:
             headers["Authorization"] = f"Bearer {self.api_key}"
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
-        response = self.transport(method, path, payload, headers)
-        data = response.get("data", response)
-        if not isinstance(data, dict):
-            raise ApiError(502, "invalid_response", "Retry and inspect the API status", "Response data was not an object")
-        return data
+        return headers
 
     def _http_transport(self, method: str, path: str, payload: dict[str, Any] | None,
                         headers: dict[str, str]) -> dict[str, Any]:
