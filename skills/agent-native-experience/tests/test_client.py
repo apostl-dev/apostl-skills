@@ -73,7 +73,7 @@ class ClientTest(unittest.TestCase):
         payload = {
             "agent_name": "Codex local agent",
             "skill_name": "agent-native-experience",
-            "skill_version": "1.1.1",
+            "skill_version": "1.1.2",
             "device_name": "Codex local agent",
             "client_instance_id": "83e765c7-cc57-47b6-b7a6-8f59a8ab032a",
             "requested_scopes": ["agent:read", "agent:deploy", "agent:keys"],
@@ -105,7 +105,7 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(payload, calls[0][2])
         self.assertNotIn("Authorization", calls[0][3])
         self.assertEqual(
-            "Apostl-Agent-Native-Experience/1.1.1 (+https://platform.apostl.dev)",
+            "Apostl-Agent-Native-Experience/1.1.2 (+https://platform.apostl.dev)",
             calls[0][3]["User-Agent"],
         )
 
@@ -123,6 +123,7 @@ class ClientTest(unittest.TestCase):
                 fake.request_authorization({}, pending_path, now=lambda: 1000.0)
 
     def test_wait_authorization_obeys_retry_after_and_slow_down_then_saves_key_once(self):
+        calls = []
         responses = [
             {"error": {"code": "authorization_pending", "message": "Pending"},
              "_response": {"status": 202, "headers": {"Retry-After": "7"}}},
@@ -140,9 +141,11 @@ class ClientTest(unittest.TestCase):
                 "balance": {"available": 100, "reserved": 0},
             }, "_response": {"status": 201, "headers": {}}},
         ]
-        fake = self.client.ApostlClient(
-            "https://platform.apostl.dev/api/v1", transport=lambda *_args: responses.pop(0),
-        )
+        def transport(*args):
+            calls.append(args)
+            return responses.pop(0)
+
+        fake = self.client.ApostlClient("https://platform.apostl.dev/api/v1", transport=transport)
         elapsed = [0.0]
         sleeps = []
 
@@ -175,6 +178,8 @@ class ClientTest(unittest.TestCase):
             self.assertFalse(pending_path.exists())
             self.assertEqual(0o600, stat.S_IMODE(credentials.stat().st_mode))
             self.assertEqual("123|apostl_one_time_secret", json.loads(credentials.read_text())["api_key"])
+            self.assertTrue(calls)
+            self.assertTrue(all(call[3]["User-Agent"] == self.client.USER_AGENT for call in calls))
 
     def test_wait_authorization_obeys_retry_after_above_local_backoff_cap(self):
         responses = [
