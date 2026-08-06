@@ -24,8 +24,8 @@ Require:
 - observable activation event promised by that journey.
 
 Accept optionally: product API/OpenAPI, repository path, `llms.txt` sources,
-human observations, business metrics/owners, corpus exclusions, and a desired
-local/sample/full mode.
+versioned market/competitor/buyer evidence, human observations, business
+metrics/owners, corpus exclusions, and a desired local/sample/full mode.
 
 Return one report using [report-contract.md](references/report-contract.md).
 Always distinguish static evidence, agent runtime evidence, human evidence, and
@@ -68,20 +68,35 @@ score into activation proof.
    python3 scripts/audit.py --evidence evidence.json --output report.md --json-output report.json
    ```
 
-5. Offer a fresh clean-environment agent quickstart. Follow the documented path
-   faithfully through the observable activation event. Record every source
-   step, deviation, command/API/browser result, and friction using
+5. Offer a fresh clean-environment agent quickstart. For the independent
+   W3Schools fixture, use `https://www.w3schools.com/html/html_intro.asp`,
+   reproduce the pinned introductory HTML locally, load it with `agent-browser`
+   in a fresh profile, and observe `This is a heading` plus `This is a
+   paragraph.`. Start with `agent-browser skills get core`. Record every source
+   step, deviation, command/API/browser result, sanitized proof reference, and friction using
    [friction-taxonomy.md](references/friction-taxonomy.md). A workaround stays
-   a friction after recovery.
-6. Keep Human Frictions separate. Record actual human observations only. If no
-   human completed the journey, write `not_run` and the exact next action. For
+   a friction after recovery. The bundled `execute_cleanroom.py` only validates
+   an imported trace or recorded fixture; it never launches a browser, runs
+   arbitrary shell commands, or turns static collection into activation proof.
+6. Keep Human Frictions separate. Record actual human observations only with
+   journey version, role, accountable owner, observation time, activation
+   evidence reference, pre-activation frictions, and next action. If no human
+   completed the journey, write `not_run` and the responsible next action. For
    each pre-activation break, propose a review-ready copy/command/link/example
    fix and its next verification step; do not edit customer docs without
    separate authorization.
-7. In full mode, give every frozen guide a terminal row and reconcile all
-   counts. Never label sampled, interrupted, or incomplete work “FULL
+7. In full mode, give every frozen guide an owned terminal row with source and
+   content hash, then reconcile all counts. Never label sampled, blocked,
+   interrupted, unowned, or incomplete work “FULL
    Documentation Covered.”
-8. Show editable RICE inputs and missing values, then sort deterministically and
+8. Keep `business_evidence.version` at `agent-native-business-evidence.v1`.
+   Separate market, competitor, and buyer observations; each needs provenance,
+   UTC observation and expiry times within a 30-day window, type, claim kind
+   (`observed`, `derived`, or `hypothesis`), confidence/status, and a validation
+   owner or next owner.
+   Missing, stale, malformed, or unverified evidence stays `unknown`/`not_run`
+   and never becomes a measured claim or score credit.
+9. Show editable RICE inputs and missing values, then sort deterministically and
    produce owner/signal/dependency-based 30/60/90 actions.
 
 ## Optional Apostl proof

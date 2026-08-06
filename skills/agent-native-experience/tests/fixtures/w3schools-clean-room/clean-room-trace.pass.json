@@ -1,0 +1,48 @@
+{
+  "trace_version": "agent-native-clean-room-trace.v1",
+  "source_url": "https://www.w3schools.com/html/html_intro.asp",
+  "local_url": "http://127.0.0.1:4173/index.html",
+  "selected_journey": "Reproduce the introductory HTML example locally",
+  "activation_event": "The rendered H1 and paragraph match the pinned introduction.",
+  "environment_identity": {
+    "working_directory_id": "fresh-temp-w3schools-intro",
+    "profile_id": "fresh-agent-browser-profile",
+    "environment_id": "clean-room-fixture",
+    "fresh_working_directory": true
+  },
+  "started_at": "2026-08-06T01:00:00Z",
+  "terminal_at": "2026-08-06T01:01:00Z",
+  "terminal_status": "pass",
+  "browser_commands": [
+    "agent-browser open http://127.0.0.1:4173/index.html",
+    "agent-browser snapshot -i --json"
+  ],
+  "steps": [
+    {
+      "ordinal": 1,
+      "action": "Create local index.html from the sanitized pinned source fixture.",
+      "timestamp": "2026-08-06T01:00:10Z",
+      "deviation": "none"
+    },
+    {
+      "ordinal": 2,
+      "action": "agent-browser open local index.html in the fresh profile.",
+      "timestamp": "2026-08-06T01:00:20Z",
+      "deviation": "none"
+    },
+    {
+      "ordinal": 3,
+      "action": "Record browser snapshot and sanitized screenshot reference.",
+      "timestamp": "2026-08-06T01:00:30Z",
+      "deviation": "none"
+    }
+  ],
+  "activation_observation": {
+    "h1": "This is a heading",
+    "paragraph": "This is a paragraph."
+  },
+  "browser_proof": {
+    "snapshot_ref": "browser-snapshot.json",
+    "snapshot_sha256": "b99894a3168343a390326c85d3c9a9a68ad37f9784463a429959c0b969bcb7f4"
+  }
+}

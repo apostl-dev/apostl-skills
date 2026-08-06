@@ -826,6 +826,12 @@ def collect_evidence(
             "status": "not_run",
             "next_action": "Have one representative human complete the same journey and record pre-activation evidence.",
         },
+        "business_evidence": {
+            "version": "agent-native-business-evidence.v1",
+            "market": [],
+            "competitors": [],
+            "buyers": [],
+        },
         "corpus": {"mode": actual_mode, "rows": corpus_rows},
         "frictions": frictions,
         "provenance": [

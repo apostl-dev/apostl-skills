@@ -36,6 +36,31 @@ python3 scripts/audit.py \
   --json-output ./agent-native-evidence/report.json
 ```
 
+## Clean-room W3Schools browser activation proof
+
+The collector is static-only. For a separately executed browser proof, use the
+credential-free fixture source `https://www.w3schools.com/html/html_intro.asp`.
+In a fresh temporary directory, reproduce the pinned introductory HTML locally,
+then use the project-standard `agent-browser` workflow with a fresh profile to
+observe exactly `This is a heading` in the H1 and `This is a paragraph.` in the
+paragraph. Start the browser workflow with `agent-browser skills get core`.
+Record ordered actions, deviations, timestamps, clean-room directory/profile
+identity, the activation observation, and only sanitized snapshot/screenshot
+references. Do not save browser cookies, profiles, raw snapshots, or raw
+screenshots.
+
+The repository's recorded non-network fixture is a validator contract, not a
+claim that this machine opened a browser. Validate it with:
+
+```bash
+python3 scripts/execute_cleanroom.py \
+  --w3schools-fixture-dir tests/fixtures/w3schools-clean-room
+```
+
+It rejects a static fetch, status code, screenshot filename, or source/local
+HTML/trace/browser-DOM mismatch. A real browser run remains separately
+evidenced and is never started by installation or the default test suite.
+
 ## Safety and bounds
 
 The collector performs signed-out `GET` requests only. It rejects:
@@ -93,6 +118,12 @@ measurements are not confused with native AFDocs output.
 - Product/API criteria remain `unknown` until supplied or executed evidence is
   added; the collector does not mark them `not_applicable` on the user's behalf.
 - Human Frictions remain `not_run` until a human completes the journey.
+- Human evidence needs the accountable owner, journey version, observation
+  time, activation evidence reference, and responsible next action; agent
+  evidence cannot substitute for it.
+- Full documentation covered is possible only after every frozen eligible guide
+  has an owned terminal row with source and content hash. Blocked or unowned
+  rows remain visible and keep coverage false.
 - A request uses the first validated public address and does not retry alternate
   addresses, so a transient failure on that address can block collection.
 - Drift-prone rubric sources are not refreshed automatically. Refresh them

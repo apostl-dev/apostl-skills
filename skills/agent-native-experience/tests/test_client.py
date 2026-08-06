@@ -12,6 +12,8 @@ from unittest.mock import patch
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
+ARTIFACT_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "public-artifacts" / "terminal-run.json"
+PDF_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "public-artifacts" / "report.pdf"
 
 
 def load_client():
@@ -536,6 +538,158 @@ class ClientTest(unittest.TestCase):
         )
         with self.assertRaises(TimeoutError):
             stuck.poll_run(8, interval_seconds=0, max_attempts=2, sleep=lambda _seconds: None)
+
+    def test_terminal_artifact_normalizer_requires_exact_app_owned_public_kinds(self):
+        response = json.loads(ARTIFACT_FIXTURE.read_text())
+        run = response["data"]
+        normalized = self.client.normalize_terminal_artifacts(response, "https://platform.apostl.dev/api/v1")
+        self.assertEqual(101, normalized["id"])
+        self.assertEqual("run-101", normalized["run_public_id"])
+        self.assertEqual("report-1", normalized["report_slug"])
+        self.assertEqual(("html", "markdown", "events", "proof_manifest", "pdf"), tuple(normalized["artifacts"]))
+        self.assertEqual("https://platform.apostl.dev/reports/report-1", normalized["artifacts"]["html"])
+        self.assertEqual("https://platform.apostl.dev/reports/report-1/pdf", normalized["artifacts"]["pdf"])
+        with self.assertRaises(ValueError):
+            self.client.normalize_terminal_artifacts(run, "https://platform.apostl.dev/api/v1")
+
+        missing = json.loads(ARTIFACT_FIXTURE.read_text())
+        missing["data"].pop("pdf_url")
+        with self.assertRaises(ValueError):
+            self.client.normalize_terminal_artifacts(missing, "https://platform.apostl.dev/api/v1")
+
+        off_platform = json.loads(ARTIFACT_FIXTURE.read_text())
+        off_platform["data"]["events_url"] = "https://runner.example/report"
+        with self.assertRaises(ValueError):
+            self.client.normalize_terminal_artifacts(off_platform, "https://platform.apostl.dev/api/v1")
+
+        cross_slug = json.loads(ARTIFACT_FIXTURE.read_text())
+        cross_slug["data"]["proof_manifest_url"] = "https://platform.apostl.dev/reports/another-report/proof-manifest"
+        with self.assertRaises(ValueError):
+            self.client.normalize_terminal_artifacts(cross_slug, "https://platform.apostl.dev/api/v1")
+
+        for field, value in (("id", 0), ("public_id", "not/a-slug"), ("status", "running")):
+            malformed = json.loads(ARTIFACT_FIXTURE.read_text())
+            malformed["data"][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.client.normalize_terminal_artifacts(malformed, "https://platform.apostl.dev/api/v1")
+
+    def test_public_artifact_parity_checks_all_kinds_and_reports_safe_failures(self):
+        terminal = self.client.normalize_terminal_artifacts(
+            json.loads(ARTIFACT_FIXTURE.read_text()), "https://platform.apostl.dev/api/v1",
+        )
+        artifacts = terminal["artifacts"]
+        responses = {
+            artifacts["html"]: {"status": 200, "url": artifacts["html"], "content_type": "text/html", "body": b"<html><h1>Evidence report</h1><h2>Executive verdict</h2><ul><li>evidence</li></ul><table><tr><th>Metric</th></tr></table><pre><code>proof</code></pre></html>"},
+            artifacts["markdown"]: {"status": 200, "url": artifacts["markdown"], "content_type": "text/markdown", "body": b"# Evidence report\n\n## Executive verdict\n\n- evidence\n"},
+            artifacts["events"]: {"status": 200, "url": artifacts["events"], "content_type": "application/json", "body": b'{"run_id":101,"run_public_id":"run-101","report_slug":"report-1","status":"passed","terminal":true,"events":[{"kind":"completed"}]}'},
+            artifacts["proof_manifest"]: {"status": 200, "url": artifacts["proof_manifest"], "content_type": "application/json", "body": b'{"run_id":101,"run_public_id":"run-101","report_slug":"report-1","proof_manifest":{"schema_version":"quickstart-report.v2.2","proofs":[{"kind":"html"}]}}'},
+            artifacts["pdf"]: {"status": 200, "url": artifacts["pdf"], "content_type": "application/pdf", "body": PDF_FIXTURE.read_bytes()},
+        }
+        result = self.client.validate_public_artifact_parity(terminal, fetch=lambda url, **_kwargs: responses[url])
+        self.assertEqual("pass", result["status"])
+        self.assertNotIn("body", result["artifacts"]["html"])
+        self.assertEqual(64, len(result["artifacts"]["pdf"]["sha256"]))
+
+        bad = dict(responses)
+        bad[artifacts["events"]] = {"status": 200, "url": "https://evil.example/events", "content_type": "application/json", "body": b"not-json"}
+        result = self.client.validate_public_artifact_parity(terminal, fetch=lambda url, **_kwargs: bad[url])
+        self.assertEqual("fail", result["status"])
+        self.assertEqual("fail", result["artifacts"]["events"]["status"])
+        self.assertTrue(any("redirect" in error for error in result["artifacts"]["events"]["errors"]))
+
+        wrong_identity = dict(responses)
+        wrong_identity[artifacts["proof_manifest"]] = {
+            "status": 200,
+            "url": artifacts["proof_manifest"],
+            "content_type": "application/json",
+            "body": b'{"run_id":101,"run_public_id":"another-run","report_slug":"report-1","proof_manifest":{"schema_version":"quickstart-report.v2.2","proofs":[]}}',
+        }
+        result = self.client.validate_public_artifact_parity(terminal, fetch=lambda url, **_kwargs: wrong_identity[url])
+        self.assertEqual("fail", result["status"])
+        self.assertTrue(any("identity" in error for error in result["artifacts"]["proof_manifest"]["errors"]))
+
+        malformed_manifest = dict(responses)
+        malformed_manifest[artifacts["proof_manifest"]] = {
+            "status": 200,
+            "url": artifacts["proof_manifest"],
+            "content_type": "application/json",
+            "body": b'{"run_id":101,"run_public_id":"run-101","report_slug":"report-1","proof_manifest":[]}',
+        }
+        result = self.client.validate_public_artifact_parity(terminal, fetch=lambda url, **_kwargs: malformed_manifest[url])
+        self.assertEqual("fail", result["status"])
+        self.assertTrue(any("proof manifest schema" in error for error in result["artifacts"]["proof_manifest"]["errors"]))
+
+        nonterminal_events = dict(responses)
+        nonterminal_events[artifacts["events"]] = {
+            "status": 200,
+            "url": artifacts["events"],
+            "content_type": "application/json",
+            "body": b'{"run_id":101,"run_public_id":"run-101","report_slug":"report-1","status":"running","terminal":false,"events":[]}',
+        }
+        result = self.client.validate_public_artifact_parity(terminal, fetch=lambda url, **_kwargs: nonterminal_events[url])
+        self.assertEqual("fail", result["status"])
+        self.assertIn("events status mismatch", result["artifacts"]["events"]["errors"])
+        self.assertIn("events artifact was not terminal", result["artifacts"]["events"]["errors"])
+
+        missing_table = dict(responses)
+        missing_table[artifacts["html"]] = {
+            "status": 200,
+            "url": artifacts["html"],
+            "content_type": "text/html",
+            "body": b"<h1>Evidence report</h1><h2>Executive verdict</h2><ul><li>evidence</li></ul><pre><code>proof</code></pre>",
+        }
+        result = self.client.validate_public_artifact_parity(terminal, fetch=lambda url, **_kwargs: missing_table[url])
+        self.assertEqual("fail", result["status"])
+        self.assertIn("HTML did not render a table", result["artifacts"]["html"]["errors"])
+
+        missing_code = dict(responses)
+        missing_code[artifacts["html"]] = {
+            "status": 200,
+            "url": artifacts["html"],
+            "content_type": "text/html",
+            "body": b"<h1>Evidence report</h1><h2>Executive verdict</h2><ul><li>evidence</li></ul><table><tr><td>proof</td></tr></table>",
+        }
+        result = self.client.validate_public_artifact_parity(terminal, fetch=lambda url, **_kwargs: missing_code[url])
+        self.assertEqual("fail", result["status"])
+        self.assertIn("HTML did not render a code block", result["artifacts"]["html"]["errors"])
+
+    def test_public_artifact_parity_enforces_fetch_bounds_content_parsing_and_identity(self):
+        terminal = self.client.normalize_terminal_artifacts(
+            json.loads(ARTIFACT_FIXTURE.read_text()), "https://platform.apostl.dev/api/v1",
+        )
+        artifacts = terminal["artifacts"]
+        responses = {
+            artifacts["html"]: {"status": 200, "url": artifacts["html"], "content_type": "text/html", "body": b"<pre># raw markdown</pre>"},
+            artifacts["markdown"]: {"status": 200, "url": artifacts["markdown"], "content_type": "text/markdown", "body": b"# Evidence report"},
+            artifacts["events"]: {"status": 200, "url": artifacts["events"], "content_type": "application/json", "body": b"{}"},
+            artifacts["proof_manifest"]: {"status": 200, "url": artifacts["proof_manifest"], "content_type": "application/json", "body": b"{}"},
+            artifacts["pdf"]: {"status": 200, "url": artifacts["pdf"], "content_type": "application/pdf", "body": b"%PDF-1.4\n%%EOF"},
+        }
+        calls = []
+
+        def fetch(url, *, timeout_seconds, max_bytes):
+            calls.append((timeout_seconds, max_bytes))
+            return responses[url]
+
+        result = self.client.validate_public_artifact_parity(
+            terminal, fetch=fetch, max_bytes=10, timeout_seconds=3,
+        )
+        self.assertEqual("fail", result["status"])
+        self.assertEqual([(3, 10)] * 5, calls)
+        self.assertTrue(any("HTML" in error for error in result["artifacts"]["html"]["errors"]))
+        self.assertTrue(any("raw Markdown" in error for error in result["artifacts"]["html"]["errors"]))
+        self.assertTrue(any("truncated" in error for error in result["artifacts"]["markdown"]["errors"]))
+        self.assertTrue(any("identity" in error for error in result["artifacts"]["events"]["errors"]))
+        self.assertTrue(any("identity" in error for error in result["artifacts"]["proof_manifest"]["errors"]))
+        self.assertIn("PDF was not parser-readable", result["artifacts"]["pdf"]["errors"])
+
+    def test_pdf_parser_requires_nonempty_extracted_text(self):
+        def successful_empty_parse(command, **_kwargs):
+            Path(command[2]).write_text("")
+            return type("Completed", (), {"returncode": 0})()
+
+        with patch.object(self.client.subprocess, "run", side_effect=successful_empty_parse):
+            self.assertFalse(self.client._parse_pdf_without_retention(b"not-retained"))
 
 
 if __name__ == "__main__":
