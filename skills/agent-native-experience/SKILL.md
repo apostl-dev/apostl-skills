@@ -134,6 +134,12 @@ Read [apostl-api.md](references/apostl-api.md), then use
      --run-mode external_strict
    ```
 
+   Read and show `final_charge` before asking for confirmation: the preview
+   reserves one logical step, while a successful terminal run captures its
+   measured execution steps and can therefore cost more. The capture never
+   exceeds the available balance at capture. Do not describe the reservation as
+   the final price.
+
 5. After explicit confirmation, deploy idempotently, start the run, and poll
    within a declared bound. Mutating commands refuse to run without both
    `--confirm` and a stable `--idempotency-key`:
@@ -170,7 +176,8 @@ Read [apostl-api.md](references/apostl-api.md), then use
 Treat authorization creation, deployment, run submission, and feedback writes
 as platform mutations. Treat local assessment/fixes, local previews,
 identity/balance/status, feedback reads, and public report reads as
-non-mutating. Disclose step consumption before submitting a run.
+non-mutating. Disclose both the one-step reservation and the measured final
+charge rule before submitting a run.
 
 ## Failure and credential rules
 

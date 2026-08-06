@@ -35,12 +35,17 @@ no client-side credential and authorize no deploy/run/feedback mutation.
 - `POST /agent/api-key/rotate`, `DELETE /agent/api-key` — rotate or revoke the
   current key without deleting the account.
 - `POST /agent/deployments/preview` — validate the intended mutation without
-  changing state.
+  changing state. Its `logical_step_reservation` is the one-step up-front hold;
+  `final_charge` explains that a successful terminal run captures measured
+  execution steps, may exceed that hold, and never exceeds the available
+  balance at capture.
 - `GET|POST /agent/projects` and
   `POST /agent/projects/{id}/workflows` — idempotent Project and versioned
   Journey Check creation.
 - `POST /agent/workflows/{id}/runs` — requires explicit confirmation and an
-  `Idempotency-Key`; reserves one logical step.
+  `Idempotency-Key`; it reserves one logical step before execution. Never call
+  that reservation the final charge: use the preview's `final_charge`
+  disclosure before asking for confirmation.
 - `GET /agent/runs/{id}` — poll terminal status and discover app-owned public
   HTML, Markdown, events, proof-manifest, and PDF URLs.
 
