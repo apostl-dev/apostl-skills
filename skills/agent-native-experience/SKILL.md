@@ -1,6 +1,13 @@
 ---
 name: agent-native-experience
 description: Audit, score, and improve agent-native product and documentation experience with evidence-backed quickstart execution, AFDocs-compatible checks, full-guide accounting, human-friction capture, RICE prioritization, and an optional Apostl-powered Journey Check. Use when someone asks to assess agent readiness, improve Agent Experience or AX, audit a docs quickstart, check llms.txt or Markdown access, test agent self-registration and API ergonomics, score a product against agent-native best practices, run a clean-room first-value journey, or create a 30/60/90 remediation plan.
+triggers:
+  - "audit our agent-native experience"
+  - "score this product for agent readiness"
+  - "find quickstart friction before first value"
+  - "check our llms.txt and agent-ready docs"
+  - "give me an Agent Experience RICE roadmap"
+  - "run an agent and human onboarding audit"
 ---
 
 # Agent Native Experience
