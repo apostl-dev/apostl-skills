@@ -13,13 +13,15 @@ test('agent-native-experience bundled Python tests pass', () => {
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 
-test('skill frontmatter only contains name and trigger-rich description', () => {
+test('skill frontmatter exposes supported trigger phrases', () => {
   const skill = readFileSync(resolve(repoRoot, 'skills/agent-native-experience/SKILL.md'), 'utf8');
   const frontmatter = skill.match(/^---\n([\s\S]*?)\n---/u)?.[1] ?? '';
   const keys = [...frontmatter.matchAll(/^([a-z_]+):/gmu)].map((match) => match[1]);
-  assert.deepEqual(keys, ['name', 'description']);
+  assert.deepEqual(keys, ['name', 'description', 'triggers']);
   assert.match(frontmatter, /agent readiness|agent-native|quickstart/iu);
   assert.match(frontmatter, /audit|assess|score/iu);
+  assert.match(frontmatter, /audit our agent-native experience/iu);
+  assert.match(frontmatter, /check our llms\.txt and agent-ready docs/iu);
 });
 
 test('routing eval covers realistic positive and negative prompts', () => {
@@ -28,6 +30,13 @@ test('routing eval covers realistic positive and negative prompts', () => {
   assert.ok(lines.length >= 12);
   assert.ok(lines.some((row) => row.should_trigger && /quickstart|agent/iu.test(row.prompt)));
   assert.ok(lines.some((row) => !row.should_trigger));
+  for (const row of lines) {
+    assert.equal(row.intent, row.prompt);
+    assert.equal(
+      row.expected_skill,
+      row.should_trigger ? 'agent-native-experience' : null,
+    );
+  }
 });
 
 test('released source registry identifies the pinned current AFDocs revision', () => {
