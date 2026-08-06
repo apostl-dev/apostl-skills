@@ -1,0 +1,12 @@
+{
+  "data": {
+    "id": 101,
+    "public_id": "run-101",
+    "status": "passed",
+    "report_url": "https://platform.apostl.dev/reports/report-1",
+    "markdown_url": "https://platform.apostl.dev/reports/report-1/markdown",
+    "events_url": "https://platform.apostl.dev/reports/report-1/events",
+    "proof_manifest_url": "https://platform.apostl.dev/reports/report-1/proof-manifest",
+    "pdf_url": "https://platform.apostl.dev/reports/report-1/pdf"
+  }
+}

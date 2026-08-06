@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -30,6 +31,11 @@ STATUS_COEFFICIENT = {
     "unknown": 0.0,
 }
 TERMINAL_GUIDE_STATUSES = {"passed", "failed", "blocked", "not_run", "excluded", "not_applicable"}
+BUSINESS_EVIDENCE_VERSION = "agent-native-business-evidence.v1"
+BUSINESS_CATEGORIES = ("market", "competitors", "buyers")
+BUSINESS_STATUSES = {"validated", "hypothesis", "unverified", "stale", "unknown", "not_run"}
+BUSINESS_CLAIM_KINDS = {"observed", "derived", "hypothesis"}
+MAX_BUSINESS_EVIDENCE_WINDOW = timedelta(days=30)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -50,14 +56,27 @@ def canonicalize_url(value: str) -> str:
     return urlunsplit((scheme, hostname, path, query, ""))
 
 
+def _valid_corpus_url(value: Any) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        parsed = urlsplit(value.strip())
+        _ = parsed.port
+    except ValueError:
+        return False
+    return parsed.scheme.lower() in {"http", "https"} and bool(parsed.hostname) and not parsed.username and not parsed.password
+
+
 def normalize_corpus(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for supplied in rows:
-        if not isinstance(supplied, dict) or not str(supplied.get("url", "")).strip():
+        if not isinstance(supplied, dict):
             continue
         row = dict(supplied)
-        row["original_url"] = str(row["url"])
-        row["url"] = canonicalize_url(str(row["url"]))
+        original_url = str(row.get("url", "")).strip()
+        row["original_url"] = original_url
+        row["url_valid"] = _valid_corpus_url(original_url)
+        row["url"] = canonicalize_url(original_url) if row["url_valid"] else original_url or "[missing-url]"
         grouped.setdefault(row["url"], []).append(row)
 
     status_priority = {"failed": 0, "blocked": 1, "not_run": 2, "passed": 3, "not_applicable": 4, "excluded": 5}
@@ -92,6 +111,13 @@ def normalize_corpus(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         row["redirect_chain"] = redirects
         if len(hashes) > 1:
             row["content_hashes"] = sorted(hashes)
+        conflicts = []
+        for field in ("content_hash", "owner", "status"):
+            values = {str(item[field]) for item in duplicates if item.get(field) not in (None, "")}
+            if len(values) > 1:
+                conflicts.append(field)
+        if conflicts:
+            row["duplicate_conflicts"] = conflicts
         normalized.append(row)
     return sorted(normalized, key=lambda row: (str(row.get("url", "")), str(row.get("status", ""))))
 
@@ -109,18 +135,44 @@ def corpus_accounting(mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         "excluded": sum(row.get("status") in {"excluded", "not_applicable"} for row in ordered),
     }
     all_terminal = all(row.get("status") in TERMINAL_GUIDE_STATUSES for row in ordered)
+    incomplete_fields: dict[str, list[str]] = {}
+    duplicate_conflicts = {
+        str(row["url"]): list(row["duplicate_conflicts"])
+        for row in ordered if row.get("duplicate_conflicts")
+    }
+    for row in ordered:
+        missing = []
+        if row.get("url_valid") is not True:
+            missing.append("url")
+        if not row.get("sources"):
+            missing.append("source")
+        if row.get("status") not in {"excluded", "not_applicable"} and not row.get("content_hash"):
+            missing.append("content_hash")
+        if not row.get("owner"):
+            missing.append("owner")
+        if row.get("status") not in TERMINAL_GUIDE_STATUSES:
+            missing.append("execution_status")
+        if row.get("duplicate_conflicts"):
+            missing.append("duplicate_conflict")
+        if row.get("status") in {"excluded", "not_applicable"} and not (row.get("exclusion_reason") or row.get("reason")):
+            missing.append("exclusion_reason")
+        if missing:
+            incomplete_fields[str(row.get("url", "unknown"))] = missing
     full_covered = (
         mode == "full"
         and bool(ordered)
         and all_terminal
-        and counts["not_run"] == 0
-        and counts["attempted"] == counts["eligible"]
+        and not incomplete_fields
+        and not duplicate_conflicts
+        and all(row.get("status") in {"passed", "failed", "excluded", "not_applicable"} for row in ordered)
     )
     frozen_payload = json.dumps(ordered, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return {
         "mode": mode,
         "frozen_sha256": hashlib.sha256(frozen_payload.encode()).hexdigest(),
         "full_documentation_covered": full_covered,
+        "incomplete_fields": incomplete_fields,
+        "duplicate_conflicts": duplicate_conflicts,
         "counts": counts,
         "rows": ordered,
     }
@@ -161,6 +213,8 @@ def _rice(friction: dict[str, Any]) -> dict[str, Any]:
     raw = friction.get("rice") if isinstance(friction.get("rice"), dict) else {}
     values = {key: raw.get(key) for key in ("reach", "impact", "confidence", "effort")}
     missing = [key for key, value in values.items() if value is None]
+    if not friction.get("metric_owner"):
+        missing.append("metric_owner")
     score = None
     if not missing:
         try:
@@ -169,6 +223,128 @@ def _rice(friction: dict[str, Any]) -> dict[str, Any]:
         except (TypeError, ValueError):
             score = None
     return {**values, "score": score, "missing": missing}
+
+
+def _parse_rfc3339_utc(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _has_timestamp(value: Any) -> bool:
+    return _parse_rfc3339_utc(value) is not None
+
+
+def _freshness_invalid_fields(observed_value: Any, valid_until_value: Any, *, now: datetime | None = None) -> list[str]:
+    observed_at = _parse_rfc3339_utc(observed_value)
+    valid_until = _parse_rfc3339_utc(valid_until_value)
+    missing = []
+    if observed_at is None:
+        missing.append("observed_at")
+    if valid_until is None:
+        missing.append("valid_until")
+    if observed_at and valid_until:
+        current = now or datetime.now(timezone.utc)
+        if valid_until <= observed_at or valid_until - observed_at > MAX_BUSINESS_EVIDENCE_WINDOW:
+            missing.append("valid_until_window")
+        elif current > valid_until:
+            missing.append("stale")
+        elif observed_at > current:
+            missing.append("observed_at_future")
+    return missing
+
+
+def normalize_business_evidence(value: Any) -> dict[str, Any]:
+    supplied = value if isinstance(value, dict) else {}
+    version_valid = supplied.get("version") == BUSINESS_EVIDENCE_VERSION
+    output: dict[str, Any] = {
+        "version": supplied.get("version") if version_valid else BUSINESS_EVIDENCE_VERSION,
+        "version_valid": version_valid,
+    }
+    for category in BUSINESS_CATEGORIES:
+        records = supplied.get(category) if isinstance(supplied.get(category), list) else []
+        normalized = []
+        for record in records:
+            item = dict(record) if isinstance(record, dict) else {}
+            missing = []
+            if not version_valid:
+                missing.append("version")
+            if not (str(item.get("source_url", "")).strip() or str(item.get("source_id", "")).strip()):
+                missing.append("source_url_or_source_id")
+            missing.extend(_freshness_invalid_fields(item.get("observed_at"), item.get("valid_until")))
+            if not str(item.get("evidence_type", "")).strip():
+                missing.append("evidence_type")
+            if not str(item.get("claim", "")).strip():
+                missing.append("claim")
+            claim_kind = str(item.get("claim_kind", ""))
+            if claim_kind not in BUSINESS_CLAIM_KINDS:
+                missing.append("claim_kind")
+            if not str(item.get("validation_owner", "")).strip() and not str(item.get("next_owner", "")).strip():
+                missing.append("validation_owner_or_next_owner")
+            status = str(item.get("status", "unknown"))
+            if status not in BUSINESS_STATUSES:
+                missing.append("status")
+            if status in {"stale", "unverified"}:
+                missing.append(status)
+            if (status == "validated" and claim_kind not in {"observed", "derived"}) or (
+                status == "hypothesis" and claim_kind != "hypothesis"
+            ):
+                missing.append("claim_kind_status")
+            normalized_status = status if not missing and status in {"validated", "hypothesis"} else "unknown"
+            owner = str(item.get("validation_owner") or item.get("next_owner") or "business-evidence-owner")
+            next_action = str(item.get("next_action") or f"Validate {category} evidence with {owner}.")
+            normalized.append({
+                "source_url": item.get("source_url") or None,
+                "source_id": item.get("source_id") or None,
+                "observed_at": item.get("observed_at") or None,
+                "valid_until": item.get("valid_until") or None,
+                "evidence_type": item.get("evidence_type") or None,
+                "claim": item.get("claim") or None,
+                "claim_kind": claim_kind or None,
+                "status": normalized_status,
+                "reported_status": status,
+                "confidence": item.get("confidence") or "unknown",
+                "validation_owner": owner,
+                "next_action": next_action,
+                "limitations": item.get("limitations") or None,
+                "invalid_fields": missing,
+                "score_credit": False,
+            })
+        output[category] = normalized
+    return output
+
+
+def normalize_human_journey(value: Any, agent_journey: Any = None) -> dict[str, Any]:
+    supplied = value if isinstance(value, dict) else {}
+    human = {"mode": "primary", **supplied}
+    required = ("journey", "journey_version", "role", "accountable_owner", "next_action", "observed_at", "evidence_reference")
+    missing = [field for field in required if not human.get(field)]
+    missing.extend(_freshness_invalid_fields(human.get("observed_at"), human.get("valid_until")))
+    if human.get("activation_reached") is not True:
+        missing.append("activation_reached")
+    if not isinstance(human.get("pre_activation_frictions"), list):
+        missing.append("pre_activation_frictions")
+    if human.get("evidence_origin") != "human_observation":
+        missing.append("human_evidence_origin")
+    agent = agent_journey if isinstance(agent_journey, dict) else {}
+    if human.get("evidence_reference") and human.get("evidence_reference") == agent.get("evidence_reference"):
+        missing.append("separate_human_evidence")
+    if human.get("evidence_hash") and human.get("evidence_hash") == agent.get("evidence_hash"):
+        missing.append("separate_human_evidence")
+    is_completed = human.get("status") == "pass" and not missing
+    if not is_completed:
+        human["reported_status"] = human.get("status", "not_run")
+        human["status"] = "not_run"
+        human["activation_reached"] = False
+        human["validation_missing"] = sorted(set(missing))
+        human["next_action"] = human.get("next_action") or "Have the accountable owner observe one representative human activation journey."
+    return human
 
 
 def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
@@ -211,8 +387,7 @@ def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, 
         for category in ("Docs", "Product")
     }
     agent_journey = evidence.get("agent_journey") if isinstance(evidence.get("agent_journey"), dict) else {}
-    human_journey = evidence.get("human_journey") if isinstance(evidence.get("human_journey"), dict) else {}
-    human_journey = {"mode": "primary", **human_journey}
+    human_journey = normalize_human_journey(evidence.get("human_journey"), agent_journey)
     category_scores = {
         "Docs": _weighted_score(by_category["Docs"], results),
         "Product": _weighted_score(by_category["Product"], results),
@@ -255,6 +430,7 @@ def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, 
     corpus = evidence.get("corpus") if isinstance(evidence.get("corpus"), dict) else {}
     accounting = corpus_accounting(str(corpus.get("mode", "sample")), corpus.get("rows", []))
     journey = evidence.get("journey") if isinstance(evidence.get("journey"), dict) else {}
+    business_evidence = normalize_business_evidence(evidence.get("business_evidence"))
 
     return sanitize_data({
         "report_version": "agent-native-experience-report.v1",
@@ -267,6 +443,7 @@ def build_report(rubric: dict[str, Any], evidence: dict[str, Any]) -> dict[str, 
         "criteria": rubric["criteria"],
         "agent_journey": agent_journey or {"status": "not_run", "activation_reached": False},
         "human_journey": human_journey or {"status": "not_run"},
+        "business_evidence": business_evidence,
         "corpus": accounting,
         "frictions": frictions,
         "provenance": evidence.get("provenance", []),
@@ -303,6 +480,18 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"- **{_value(friction.get('title'))}** — {_value(friction.get('business_consequence'))}",
             f"  - Evidence type: {_value(friction.get('impact_type'))}; metric: {_value(friction.get('metric'))}; owner: {_value(friction.get('metric_owner'))}",
         ]
+
+    lines += ["", "## Business evidence", ""]
+    for category in BUSINESS_CATEGORIES:
+        lines.append(f"### {category.capitalize()}")
+        records = report["business_evidence"][category]
+        if not records:
+            lines.append("- Status: **not_run**; next action: collect a source-backed observation with a validation owner.")
+        for record in records:
+            source = record.get("source_url") or record.get("source_id")
+            lines.append(f"- Status: **{_value(record.get('status'))}**; source: {_value(source)}; observed: {_value(record.get('observed_at'))}")
+            lines.append(f"  - Claim: {_value(record.get('claim'))}; Claim kind: {_value(record.get('claim_kind'))}; confidence: {_value(record.get('confidence'))}; validation owner: {_value(record.get('validation_owner'))}")
+            lines.append(f"  - Next action: {_value(record.get('next_action'))}; limitations: {_value(record.get('limitations'))}")
 
     lines += [
         "", "## Scope and environment", "",
@@ -352,9 +541,9 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"  - Smallest fix: {_value(item.get('smallest_fix'))}",
         ]
 
-    lines += ["", "## Guide-by-guide coverage", "", "| URL | Sources | Redirects | Auth gate | Terminal status | Blocker or exclusion | Content hash |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    lines += ["", "## Guide-by-guide coverage", "", "| URL | Sources | Owner | Redirects | Auth gate | Terminal status | Blocker or exclusion | Content hash |", "| --- | --- | --- | --- | --- | --- | --- | --- |"]
     for row in report["corpus"]["rows"]:
-        lines.append(f"| {_value(row.get('url'))} | {_value(', '.join(row.get('sources', [])))} | {_value(' -> '.join(row.get('redirect_chain', [])))} | {_value(row.get('auth_gate'))} | {_value(row.get('status'))} | {_value(row.get('blocker') or row.get('exclusion_reason') or row.get('reason'))} | {_value(row.get('content_hash'))} |")
+        lines.append(f"| {_value(row.get('url'))} | {_value(', '.join(row.get('sources', [])))} | {_value(row.get('owner'))} | {_value(' -> '.join(row.get('redirect_chain', [])))} | {_value(row.get('auth_gate'))} | {_value(row.get('status'))} | {_value(row.get('blocker') or row.get('exclusion_reason') or row.get('reason'))} | {_value(row.get('content_hash'))} |")
 
     lines += ["", "## Deduplicated friction evidence", ""]
     for friction in report["frictions"]:

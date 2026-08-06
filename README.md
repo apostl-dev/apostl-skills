@@ -109,9 +109,37 @@ persisted. Static collection does not prove activation; enrich `evidence.json`
 with the real agent trace and rerun `audit.py` after executing the selected
 journey.
 
+#### W3Schools clean-room browser proof
+
+The collector command above is deliberately not browser activation proof. For
+the separately executed independent fixture, use
+`https://www.w3schools.com/html/html_intro.asp`, reproduce its pinned
+introductory HTML in a fresh local directory, then use `agent-browser` with a
+fresh profile to observe the rendered H1 `This is a heading` and paragraph
+`This is a paragraph.`. Begin the browser workflow with `agent-browser skills
+get core`; record only the clean-room identity, ordered actions/deviations,
+timestamps, observed text, and sanitized snapshot/screenshot references.
+
+The checked-in fixture is a non-network validator, not a browser-run claim:
+
+```bash
+python3 skills/agent-native-experience/scripts/execute_cleanroom.py \
+  --w3schools-fixture-dir skills/agent-native-experience/tests/fixtures/w3schools-clean-room
+```
+
+It rejects source/local-index/trace/browser-DOM mismatches and static-only
+evidence. It does not open a browser, persist a profile, or run automatically
+during installation.
+
 Inputs are the target URL, selected journey, activation event, and environment.
 Optional inputs include a repository or OpenAPI spec, frozen corpus inventory,
-human observations, and business metrics. Outputs include the report, normalized
+human observations, and business metrics. Business observations use the
+versioned `agent-native-business-evidence.v1` schema with separate market,
+competitor, and buyer source records; each record needs provenance, UTC
+observation and expiry times within a 30-day window, type, claim kind,
+confidence/status, and validation owner or next owner.
+Missing, stale, malformed, or unverified records remain `unknown`/`not_run`
+and do not earn score credit. Outputs include the report, normalized
 check results, corpus counts and hashes, source provenance, friction taxonomy,
 editable RICE assumptions, and the proposed 30/60/90 plan.
 
@@ -175,6 +203,12 @@ keys, tokens, cookies, email contents, and environment values are excluded from
 reports. Unexecuted work stays visible. A sampled run cannot claim full corpus
 coverage, a workaround remains friction, and a provider or sandbox blocker is
 reported rather than waived.
+
+Human and full-corpus proof are also separate from static checks: a human pass
+requires an accountable owner, journey/version, observation time, activation
+evidence reference, and responsible next action. Full documentation covered is
+possible only when every frozen eligible guide has an owned terminal row with
+source and content hash; blocked, sampled, or unowned rows keep it false.
 
 The skill format works with agents supported by the open `skills` CLI, including
 Codex and Claude Code. Product-specific runtime behavior still depends on the

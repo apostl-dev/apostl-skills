@@ -205,6 +205,8 @@ class AuditTest(unittest.TestCase):
             "recovery_code": "opaque-code-value",
             "session_cookie_value": "opaque-cookie-value",
             "nested": {"database_password_value": "opaque-password-value"},
+            "request_body": "opaque-request-body",
+            "email_contents": "opaque-email-contents",
         }
 
         with self.assertRaises(self.audit.SensitiveOutputError):
@@ -215,7 +217,7 @@ class AuditTest(unittest.TestCase):
         for canary in [
             "opaque-client-value", "opaque-refresh-value", "opaque-env-value",
             "opaque-key-value", "opaque-code-value", "opaque-cookie-value",
-            "opaque-password-value",
+            "opaque-password-value", "opaque-request-body", "opaque-email-contents",
         ]:
             self.assertNotIn(canary, serialized)
 
@@ -261,6 +263,7 @@ class AuditTest(unittest.TestCase):
         self.assertEqual([
             "Executive verdict",
             "Business impact",
+            "Business evidence",
             "Scope and environment",
             "Score and rubric version",
             "Source/corpus coverage",
@@ -279,6 +282,219 @@ class AuditTest(unittest.TestCase):
             "Limitations",
             "Public artifact links",
         ], headings)
+
+    def test_business_evidence_is_versioned_separate_and_source_backed(self):
+        evidence = {
+            "checks": {}, "agent_journey": {"status": "not_run", "activation_reached": False},
+            "human_journey": {"status": "not_run"}, "corpus": {"mode": "sample", "rows": []},
+            "business_evidence": {
+                "version": "agent-native-business-evidence.v1",
+                "market": [{
+                    "source_url": "https://example.com/market-study",
+                    "observed_at": "2026-08-06T01:00:00Z", "evidence_type": "public_research",
+                    "claim": "Agents encounter setup friction.", "status": "validated",
+                    "claim_kind": "observed", "valid_until": "2026-08-30T01:00:00Z",
+                    "confidence": "medium", "validation_owner": "research-owner",
+                    "limitations": "One public source.",
+                }],
+                "competitors": [{
+                    "source_id": "competitor-brief-2026-08", "observed_at": "2026-08-06T01:00:00Z",
+                    "evidence_type": "supplied_source", "claim": "A competitor publishes a quickstart.",
+                    "status": "hypothesis", "confidence": "low", "next_owner": "product-owner",
+                    "claim_kind": "hypothesis", "valid_until": "2026-08-30T01:00:00Z",
+                    "next_action": "Validate the published quickstart.",
+                }],
+                "buyers": [{
+                    "source_id": "buyer-interview-summary-7", "observed_at": "2026-08-06T01:00:00Z",
+                    "evidence_type": "supplied_source", "claim": "Buyers need activation proof.",
+                    "status": "validated", "confidence": "high", "validation_owner": "research-owner",
+                    "claim_kind": "derived", "valid_until": "2026-08-30T01:00:00Z",
+                }],
+            },
+            "frictions": [],
+        }
+
+        report = self.audit.build_report(self.rubric, evidence)
+        markdown = self.audit.render_markdown(report)
+
+        self.assertEqual("agent-native-business-evidence.v1", report["business_evidence"]["version"])
+        self.assertEqual("validated", report["business_evidence"]["market"][0]["status"])
+        self.assertEqual("hypothesis", report["business_evidence"]["competitors"][0]["status"])
+        self.assertEqual("buyer-interview-summary-7", report["business_evidence"]["buyers"][0]["source_id"])
+        self.assertIn("Claim kind: observed", markdown)
+        self.assertIn("Claim kind: hypothesis", markdown)
+        self.assertIn("## Business evidence", markdown)
+        self.assertIn("https://example.com/market-study", markdown)
+
+    def test_invalid_business_evidence_stays_unknown_and_does_not_credit_rice(self):
+        report = self.audit.build_report(self.rubric, {
+            "checks": {}, "agent_journey": {"status": "not_run", "activation_reached": False},
+            "human_journey": {"status": "not_run"}, "corpus": {"mode": "sample", "rows": []},
+            "business_evidence": {"version": "agent-native-business-evidence.v1", "market": [{
+                "claim": "A stale unsupported claim.", "status": "validated", "validation_owner": "research-owner",
+            }]},
+            "frictions": [{"id": "F-1", "impact_type": "hypothesis", "metric": "activation_rate",
+                           "rice": {"reach": 10, "impact": 3, "confidence": 0.8, "effort": 1}}],
+        })
+
+        invalid = report["business_evidence"]["market"][0]
+        self.assertEqual("unknown", invalid["status"])
+        self.assertFalse(invalid["score_credit"])
+        self.assertEqual("research-owner", invalid["validation_owner"])
+        self.assertTrue(invalid["next_action"])
+        self.assertIsNone(report["frictions"][0]["rice"]["score"])
+        self.assertIn("unknown", self.audit.render_markdown(report))
+
+        wrong_version = self.audit.build_report(self.rubric, {
+            "checks": {}, "agent_journey": {"status": "not_run", "activation_reached": False},
+            "human_journey": {"status": "not_run"}, "corpus": {"mode": "sample", "rows": []},
+            "business_evidence": {"version": "unrecognized-business-schema", "market": [{
+                "source_id": "public-study", "observed_at": "2026-08-06T01:00:00Z",
+                "evidence_type": "public_research", "claim": "Claim", "status": "validated",
+                "validation_owner": "research-owner",
+            }]},
+        })
+        self.assertEqual("unknown", wrong_version["business_evidence"]["market"][0]["status"])
+        self.assertIn("version", wrong_version["business_evidence"]["market"][0]["invalid_fields"])
+
+    def test_business_evidence_rejects_secret_fields(self):
+        evidence = {
+            "checks": {}, "agent_journey": {"status": "not_run", "activation_reached": False},
+            "human_journey": {"status": "not_run"}, "corpus": {"mode": "sample", "rows": []},
+            "business_evidence": {"version": "agent-native-business-evidence.v1", "buyers": [{
+                "source_id": "buyer-brief", "observed_at": "2026-08-06T01:00:00Z",
+                "evidence_type": "supplied_source", "claim": "Private note", "status": "validated",
+                "validation_owner": "research-owner", "api_key": "sk-should-not-survive",
+            }]},
+        }
+        with self.assertRaises(self.audit.SensitiveOutputError):
+            self.audit.build_report(self.rubric, evidence)
+
+    def test_business_evidence_rejects_stale_or_unbounded_validated_claims(self):
+        record = {
+            "source_id": "market-study", "observed_at": "2000-01-01T00:00:00Z",
+            "valid_until": "2000-01-30T00:00:00Z", "evidence_type": "public_research",
+            "claim": "An old finding.", "claim_kind": "observed", "status": "validated",
+            "validation_owner": "research-owner",
+        }
+        normalized = self.audit.normalize_business_evidence({
+            "version": "agent-native-business-evidence.v1", "market": [record],
+        })["market"][0]
+        self.assertEqual("unknown", normalized["status"])
+        self.assertIn("stale", normalized["invalid_fields"])
+
+        overlong = {**record, "observed_at": "2026-08-06T00:00:00Z",
+                    "valid_until": "2026-09-06T00:00:00Z"}
+        normalized = self.audit.normalize_business_evidence({
+            "version": "agent-native-business-evidence.v1", "market": [overlong],
+        })["market"][0]
+        self.assertEqual("unknown", normalized["status"])
+        self.assertIn("valid_until_window", normalized["invalid_fields"])
+
+        missing_kind = {**record, "observed_at": "2026-08-06T00:00:00Z",
+                        "valid_until": "2026-08-30T00:00:00Z"}
+        missing_kind.pop("claim_kind")
+        normalized = self.audit.normalize_business_evidence({
+            "version": "agent-native-business-evidence.v1", "market": [missing_kind],
+        })["market"][0]
+        self.assertEqual("unknown", normalized["status"])
+        self.assertIn("claim_kind", normalized["invalid_fields"])
+
+    def test_human_pass_requires_completed_owned_activation_evidence(self):
+        base = {"checks": {}, "agent_journey": {"status": "pass", "activation_reached": True},
+                "corpus": {"mode": "sample", "rows": []}, "frictions": []}
+        incomplete = self.audit.build_report(self.rubric, {**base, "human_journey": {
+            "status": "pass", "journey": "Install guide", "role": "developer",
+            "accountable_owner": "human-study-owner", "next_action": "Observe a human.",
+        }})
+        self.assertEqual("not_run", incomplete["human_journey"]["status"])
+        self.assertEqual("human-study-owner", incomplete["human_journey"]["accountable_owner"])
+        self.assertIn("Next action", self.audit.render_markdown(incomplete))
+
+        completed = self.audit.build_report(self.rubric, {**base, "human_journey": {
+            "status": "pass", "journey": "Install guide", "journey_version": "v1", "role": "developer",
+            "accountable_owner": "human-study-owner", "next_action": "Review evidence.",
+            "observed_at": "2026-08-06T01:00:00Z", "activation_reached": True,
+            "evidence_reference": "human-session-01", "evidence_origin": "human_observation",
+            "valid_until": "2026-08-30T01:00:00Z",
+            "pre_activation_frictions": [],
+        }})
+        self.assertEqual("pass", completed["human_journey"]["status"])
+
+    def test_human_pass_requires_a_fresh_bounded_valid_until(self):
+        record = {
+            "status": "pass", "journey": "Install guide", "journey_version": "v1", "role": "developer",
+            "accountable_owner": "human-study-owner", "next_action": "Review evidence.",
+            "observed_at": "2026-08-06T01:00:00Z", "activation_reached": True,
+            "evidence_reference": "human-session-01", "evidence_origin": "human_observation",
+            "pre_activation_frictions": [],
+        }
+        missing_expiry = self.audit.normalize_human_journey(record)
+        self.assertEqual("not_run", missing_expiry["status"])
+        self.assertIn("valid_until", missing_expiry["validation_missing"])
+
+        stale = self.audit.normalize_human_journey({
+            **record, "observed_at": "2000-01-01T00:00:00Z", "valid_until": "2000-01-30T00:00:00Z",
+        })
+        self.assertEqual("not_run", stale["status"])
+        self.assertIn("stale", stale["validation_missing"])
+
+        overlong = self.audit.normalize_human_journey({
+            **record, "valid_until": "2026-09-06T01:00:00Z",
+        })
+        self.assertEqual("not_run", overlong["status"])
+        self.assertIn("valid_until_window", overlong["validation_missing"])
+
+    def test_human_pass_rejects_agent_origin_or_reused_agent_evidence(self):
+        base = {"checks": {}, "agent_journey": {
+            "status": "pass", "activation_reached": True,
+            "evidence_reference": "agent-trace-01", "evidence_hash": "a" * 64,
+        }, "corpus": {"mode": "sample", "rows": []}, "frictions": []}
+        human = {
+            "status": "pass", "journey": "Install guide", "journey_version": "v1", "role": "developer",
+            "accountable_owner": "human-study-owner", "next_action": "Review evidence.",
+            "observed_at": "2026-08-06T01:00:00Z", "activation_reached": True,
+            "evidence_reference": "agent-trace-01", "evidence_hash": "a" * 64,
+            "evidence_origin": "agent_trace", "pre_activation_frictions": [],
+        }
+        report = self.audit.build_report(self.rubric, {**base, "human_journey": human})
+        self.assertEqual("not_run", report["human_journey"]["status"])
+        self.assertIn("human_evidence_origin", report["human_journey"]["validation_missing"])
+        self.assertIn("separate_human_evidence", report["human_journey"]["validation_missing"])
+
+    def test_full_corpus_requires_owned_rows_and_never_calls_blocked_rows_covered(self):
+        required = {"source": "sitemap", "content_hash": "a" * 64, "owner": "docs-owner"}
+        unowned = self.audit.corpus_accounting("full", [{"url": "https://example.com/a", "status": "passed", **required},
+                                                          {"url": "https://example.com/b", "status": "passed", "source": "sitemap", "content_hash": "b" * 64}])
+        self.assertFalse(unowned["full_documentation_covered"])
+        self.assertIn("owner", unowned["incomplete_fields"]["https://example.com/b"])
+
+        blocked = self.audit.corpus_accounting("full", [{"url": "https://example.com/a", "status": "blocked", **required}])
+        self.assertFalse(blocked["full_documentation_covered"])
+
+    def test_full_corpus_conflicting_canonical_duplicates_are_visible_and_not_covered(self):
+        rows = [
+            {"url": "https://example.com/a", "status": "passed", "source": "sitemap",
+             "content_hash": "a" * 64, "owner": "docs-owner-a"},
+            {"url": "https://example.com/a/", "status": "passed", "source": "llms.txt",
+             "content_hash": "b" * 64, "owner": "docs-owner-b"},
+        ]
+        corpus = self.audit.corpus_accounting("full", rows)
+        self.assertFalse(corpus["full_documentation_covered"])
+        self.assertIn("https://example.com/a", corpus["duplicate_conflicts"])
+        self.assertEqual(["content_hash", "owner"], corpus["duplicate_conflicts"]["https://example.com/a"])
+
+    def test_full_corpus_rejects_malformed_urls_and_unexplained_exclusions(self):
+        required = {"status": "passed", "source": "sitemap", "content_hash": "a" * 64, "owner": "docs-owner"}
+        invalid_url = self.audit.corpus_accounting("full", [{"url": "not-a-url", **required}])
+        self.assertFalse(invalid_url["full_documentation_covered"])
+        self.assertIn("url", invalid_url["incomplete_fields"]["not-a-url"])
+
+        excluded = self.audit.corpus_accounting("full", [{
+            "url": "https://example.com/hidden", "status": "excluded", "source": "sitemap", "owner": "docs-owner",
+        }])
+        self.assertFalse(excluded["full_documentation_covered"])
+        self.assertIn("exclusion_reason", excluded["incomplete_fields"]["https://example.com/hidden"])
 
 
 if __name__ == "__main__":

@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import random
 import re
+import subprocess
 import tempfile
 import time
 import urllib.error
@@ -38,6 +40,18 @@ MAX_AUTHORIZATION_INTERVAL_SECONDS = 60.0
 FEEDBACK_TARGET_TYPES = {"project", "workflow", "run", "report", "recommendation"}
 FEEDBACK_KINDS = {"accepted_fix", "rejected_fix", "correction", "free_form_note", "follow_up_request"}
 FEEDBACK_FIELDS = {"target_type", "target_public_id", "kind", "message", "target_revision"}
+TERMINAL_RUN_STATUSES = {"passed", "blocked", "stalled", "failed", "cancelled", "superseded"}
+PUBLIC_ARTIFACT_KINDS = ("html", "markdown", "events", "proof_manifest", "pdf")
+MAX_PUBLIC_ARTIFACT_BYTES = 1_000_000
+PUBLIC_ARTIFACT_TIMEOUT_SECONDS = 10.0
+PUBLIC_ID_PATTERN = re.compile(r"\A[a-zA-Z0-9][a-zA-Z0-9-]{0,119}\Z")
+TERMINAL_ARTIFACT_FIELDS = {
+    "html": "report_url",
+    "markdown": "markdown_url",
+    "events": "events_url",
+    "proof_manifest": "proof_manifest_url",
+    "pdf": "pdf_url",
+}
 
 
 class ConfirmationRequired(RuntimeError):
@@ -76,6 +90,197 @@ class ApiError(RuntimeError):
         self.recovery = recovery
         self.retry_after = retry_after
         super().__init__(redact(f"HTTP {status} {code}: {message}. Recovery: {recovery}"))
+
+
+def _public_platform_origin(api_base: str) -> tuple[str, str]:
+    parsed = urllib.parse.urlsplit(api_base)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise ValueError("Public artifact validation requires an HTTPS Apostl platform base URL")
+    return parsed.scheme, parsed.hostname.lower()
+
+
+def _is_app_owned_public_artifact(url: Any, api_base: str, expected_path: str) -> bool:
+    if not isinstance(url, str):
+        return False
+    parsed = urllib.parse.urlsplit(url)
+    scheme, hostname = _public_platform_origin(api_base)
+    return (
+        parsed.scheme == scheme and parsed.hostname and parsed.hostname.lower() == hostname
+        and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
+        and parsed.path == expected_path
+    )
+
+
+def _report_slug_from_url(url: Any, api_base: str) -> str | None:
+    if not isinstance(url, str):
+        return None
+    parsed = urllib.parse.urlsplit(url)
+    scheme, hostname = _public_platform_origin(api_base)
+    if (
+        parsed.scheme != scheme or not parsed.hostname or parsed.hostname.lower() != hostname
+        or parsed.username or parsed.password or parsed.query or parsed.fragment
+    ):
+        return None
+    match = re.fullmatch(r"/reports/([a-zA-Z0-9][a-zA-Z0-9-]{0,119})", parsed.path)
+    return match.group(1) if match else None
+
+
+def _terminal_artifact_paths(report_slug: str) -> dict[str, str]:
+    root = f"/reports/{report_slug}"
+    return {
+        "html": root,
+        "markdown": f"{root}/markdown",
+        "events": f"{root}/events",
+        "proof_manifest": f"{root}/proof-manifest",
+        "pdf": f"{root}/pdf",
+    }
+
+
+def normalize_terminal_artifacts(response: Any, api_base: str = DEFAULT_BASE_URL) -> dict[str, Any]:
+    """Fail-closed mapping of the frozen P1 terminal `data` response fields."""
+    run = response.get("data") if isinstance(response, dict) else None
+    if not isinstance(run, dict) or str(run.get("status")) not in TERMINAL_RUN_STATUSES:
+        raise ValueError("Only a terminal run response can provide public artifacts")
+    run_id = run.get("id")
+    run_public_id = run.get("public_id")
+    if isinstance(run_id, bool) or not isinstance(run_id, int) or run_id <= 0:
+        raise ValueError("Terminal run response requires a positive id")
+    if not isinstance(run_public_id, str) or PUBLIC_ID_PATTERN.fullmatch(run_public_id) is None:
+        raise ValueError("Terminal run response requires a valid public_id slug")
+    report_slug = _report_slug_from_url(run.get("report_url"), api_base)
+    if report_slug is None:
+        raise ValueError("Terminal report_url must be a canonical app-owned report path")
+    expected_paths = _terminal_artifact_paths(report_slug)
+    normalized: dict[str, str] = {}
+    for kind in PUBLIC_ARTIFACT_KINDS:
+        field = TERMINAL_ARTIFACT_FIELDS[kind]
+        url = run.get(field)
+        if not _is_app_owned_public_artifact(url, api_base, expected_paths[kind]):
+            raise ValueError(f"Terminal {field} is missing, malformed, off-platform, or cross-slug")
+        normalized[kind] = str(url)
+    return {
+        "id": run_id,
+        "run_public_id": run_public_id,
+        "report_slug": report_slug,
+        "status": str(run["status"]),
+        "artifacts": {kind: normalized[kind] for kind in PUBLIC_ARTIFACT_KINDS},
+    }
+
+
+def _artifact_error(errors: list[str], condition: bool, message: str) -> None:
+    if not condition:
+        errors.append(message)
+
+
+def _parse_pdf_without_retention(body: bytes) -> bool:
+    try:
+        with tempfile.TemporaryDirectory(prefix="apostl-report-pdf-") as directory:
+            pdf_path = Path(directory) / "report.pdf"
+            text_path = Path(directory) / "report.txt"
+            pdf_path.write_bytes(body)
+            result = subprocess.run(
+                ["pdftotext", str(pdf_path), str(text_path)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=PUBLIC_ARTIFACT_TIMEOUT_SECONDS, check=False,
+            )
+            return (
+                result.returncode == 0
+                and text_path.is_file()
+                and bool(text_path.read_text(errors="replace").strip())
+            )
+    except (FileNotFoundError, OSError, subprocess.SubprocessError):
+        return False
+
+
+def validate_public_artifact_parity(
+    terminal: dict[str, Any],
+    *,
+    fetch: Callable[..., dict[str, Any]],
+    max_bytes: int = MAX_PUBLIC_ARTIFACT_BYTES,
+    timeout_seconds: float = PUBLIC_ARTIFACT_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    """Read-only, injected-fetch parity validation that never retains report bodies."""
+    artifacts = terminal.get("artifacts") if isinstance(terminal, dict) else None
+    run_id = terminal.get("id") if isinstance(terminal, dict) else None
+    run_public_id = terminal.get("run_public_id") if isinstance(terminal, dict) else None
+    report_slug = terminal.get("report_slug") if isinstance(terminal, dict) else None
+    status = terminal.get("status") if isinstance(terminal, dict) else None
+    if (
+        max_bytes < 1 or timeout_seconds <= 0 or not isinstance(artifacts, dict)
+        or set(artifacts) != set(PUBLIC_ARTIFACT_KINDS)
+        or isinstance(run_id, bool) or not isinstance(run_id, int) or run_id <= 0
+        or not isinstance(run_public_id, str) or PUBLIC_ID_PATTERN.fullmatch(run_public_id) is None
+        or not isinstance(report_slug, str) or PUBLIC_ID_PATTERN.fullmatch(report_slug) is None
+        or str(status) not in TERMINAL_RUN_STATUSES
+    ):
+        raise ValueError("Public artifact parity requires bounded values for exactly five artifact kinds")
+    results: dict[str, dict[str, Any]] = {}
+    for kind in PUBLIC_ARTIFACT_KINDS:
+        url = artifacts[kind]
+        errors: list[str] = []
+        metadata: dict[str, Any] = {"url": url, "status": "fail", "errors": errors}
+        try:
+            response = fetch(url, timeout_seconds=timeout_seconds, max_bytes=max_bytes)
+            if not isinstance(response, dict):
+                raise ValueError("fetch response was not an object")
+            body = response.get("body")
+            if not isinstance(body, bytes):
+                raise ValueError("fetch response body was not bytes")
+            final_url = response.get("url")
+            content_type = str(response.get("content_type", "")).split(";", 1)[0].lower()
+            metadata.update({"final_url": final_url, "http_status": response.get("status"), "content_type": content_type, "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()})
+            _artifact_error(errors, final_url == url, "redirect or final URL mismatch")
+            _artifact_error(errors, response.get("status") == 200, "HTTP status was not 200")
+            _artifact_error(errors, len(body) <= max_bytes, "response exceeded byte limit")
+            expected_types = {"html": {"text/html"}, "markdown": {"text/markdown", "text/plain"}, "events": {"application/json"}, "proof_manifest": {"application/json"}, "pdf": {"application/pdf"}}
+            _artifact_error(errors, content_type in expected_types[kind], "unexpected content type")
+            if kind == "html":
+                text = body.decode("utf-8", errors="replace")
+                lower = text.lower()
+                _artifact_error(errors, bool(re.search(r"<h[1-6][^>]*>[^<]*evidence report", lower)), "HTML did not render a visible Evidence report heading")
+                _artifact_error(errors, bool(re.search(r"<h[1-6][^>]*>[^<]*(executive verdict|business impact)", lower)), "HTML did not render formatted evidence sections")
+                _artifact_error(errors, bool(re.search(r"<(ul|ol)\b", lower)), "HTML did not render a list")
+                _artifact_error(errors, bool(re.search(r"<table\b", lower)), "HTML did not render a table")
+                _artifact_error(errors, bool(re.search(r"<pre[^>]*>\s*<code\b", lower)), "HTML did not render a code block")
+                _artifact_error(errors, re.search(r"<pre[^>]*>\s*#", lower) is None, "HTML exposes raw Markdown in a visible preformatted block")
+            elif kind == "markdown":
+                text = body.decode("utf-8", errors="replace")
+                _artifact_error(errors, text.startswith("# Evidence report\n") and "\n## " in text and text.endswith("\n"), "Markdown appears truncated or lacks report sections")
+            elif kind in {"events", "proof_manifest"}:
+                try:
+                    structured = json.loads(body.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    errors.append("structured artifact was not parseable JSON")
+                else:
+                    _artifact_error(errors, isinstance(structured, dict), "structured artifact was not a JSON object")
+                    _artifact_error(errors, bool(structured), "structured artifact envelope was empty")
+                    if isinstance(structured, dict):
+                        _artifact_error(
+                            errors,
+                            structured.get("run_id") == run_id
+                            and structured.get("run_public_id") == run_public_id
+                            and structured.get("report_slug") == report_slug,
+                            "structured artifact identity mismatch",
+                        )
+                        if kind == "events":
+                            _artifact_error(errors, structured.get("status") == status, "events status mismatch")
+                            _artifact_error(errors, structured.get("terminal") is True, "events artifact was not terminal")
+                            _artifact_error(errors, isinstance(structured.get("events"), list), "structured artifact is missing events")
+                        else:
+                            manifest = structured.get("proof_manifest")
+                            _artifact_error(errors, isinstance(manifest, dict) and bool(manifest), "proof manifest schema is missing nested proof_manifest")
+                            if isinstance(manifest, dict):
+                                _artifact_error(errors, isinstance(manifest.get("schema_version"), str) and bool(manifest["schema_version"].strip()), "proof manifest schema is missing schema_version")
+                                _artifact_error(errors, isinstance(manifest.get("proofs"), list), "proof manifest schema is missing proofs")
+            else:
+                _artifact_error(errors, _parse_pdf_without_retention(body), "PDF was not parser-readable")
+        except (KeyError, ValueError, TypeError) as error:
+            errors.append(str(error))
+        if not errors:
+            metadata["status"] = "pass"
+            metadata.pop("errors")
+        results[kind] = metadata
+    return {"status": "pass" if all(item["status"] == "pass" for item in results.values()) else "fail", "artifacts": results}
 
 
 def redact(value: str) -> str:

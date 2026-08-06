@@ -4,6 +4,33 @@ Base: `https://platform.apostl.dev/api/v1`. Platform mode talks only to these
 Apostl endpoints. GitHub is distribution only; it is not an authorization, run,
 tracking, feedback, image, or runtime channel.
 
+## P1 platform prerequisite
+
+This local skill revision does not claim platform artifact parity or live E2E
+proof. Those checks remain blocked until the platform-owned signed-out identity
+envelope P1 is deployed and verified. Until then, do not construct runner-direct
+or GitHub artifact URLs and do not treat a mock response, historical report,
+health check, or HTTP 200 as live platform acceptance.
+
+When P1 is available, `GET /agent/runs/{id}` returns the terminal run inside a
+`{ "data": { ... } }` wrapper. Its `data` object must provide positive `id`,
+the run's slug-like `public_id`, terminal `status`, and exactly these app-owned
+URLs: `report_url`, `markdown_url`, `events_url`, `proof_manifest_url`, and
+`pdf_url`. `report_slug` is not a terminal data field: derive it only from the
+validated direct platform `report_url` path. The other public URLs must use
+that same derived slug, never the run `public_id`.
+
+The events body must carry matching `run_id`, `run_public_id`, `report_slug`,
+`status`, `terminal: true`, and an `events` list. The proof-manifest body must
+carry matching run identity and a nonempty nested `proof_manifest` object with
+a nonempty `schema_version` and `proofs` list.
+
+The local injected-fetch tests validate this frozen shape and reject
+raw-Markdown HTML, truncated Markdown, empty or mismatched identity envelopes,
+HTML missing any required heading/list/table/code-block structure, and PDFs
+for which `pdftotext` produces no text. Those tests are contract
+coverage, not P1 or live parity proof.
+
 ## Link authorization
 
 - `POST /agent/authorizations` — create a short-lived consent transaction from

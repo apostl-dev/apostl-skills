@@ -14,6 +14,9 @@ class SensitiveOutputError(ValueError):
 FORBIDDEN_KEYS = {
     "activation_code", "api_key", "authorization", "cookie", "cookies",
     "password", "secret", "session", "session_id", "token", "oauth_token",
+    "email_content", "email_contents", "raw_browser_data", "raw_request",
+    "raw_response", "raw_request_body", "raw_response_body", "request_body",
+    "response_body", "browser_profile_data",
 }
 SENSITIVE_KEY_PARTS = {
     "authorization", "code", "cookie", "credential", "env", "key",

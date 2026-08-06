@@ -1,0 +1,8 @@
+{
+  "snapshot_version": "agent-browser-snapshot.v1",
+  "activation_observation": {
+    "h1": "This is a heading",
+    "paragraph": "This is a paragraph."
+  },
+  "sanitized": true
+}
