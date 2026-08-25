@@ -42,6 +42,12 @@ runtime, permission to install a package, and an authorized deploy path. A human
 account is not required until claim; the owner then uses Google, GitHub, or an
 email magic link.
 
+Reserved documentation domains such as `example.com`, `example.org`,
+`example.net`, `.example`, `.invalid`, and `.test` cannot prove deploy control.
+If the user supplied one, explain that boundary and obtain an authorized public
+origin before creating a setup. Do not use a reserved domain as a disposable
+production demo.
+
 ## Start without an account
 
 An agent may create an unclaimed setup without waiting for a human. This is a
@@ -52,11 +58,14 @@ Run from this skill directory:
 
 ```bash
 python3 scripts/pulse_setup.py start \
-  --origin https://docs.example.com \
+  --origin https://replace-me.invalid \
   --verification-path /llms.txt \
-  --project-name "Example docs" \
+  --project-name "My public site" \
   --agent-name "Codex"
 ```
+
+Replace `replace-me.invalid` before running. The helper rejects it and other
+reserved documentation domains before it contacts Apostl.
 
 The command prints non-secret setup metadata and the local credentials path.
 It stores the API key and opaque setup token in an owner-only `0600` file. Never
@@ -131,6 +140,12 @@ the human only the opaque one-time `claim_url`. The owner signs in with Google,
 GitHub, or an email magic link; password authentication is not available. The
 ingest API key remains active after claim and must not be rotated merely because
 the project was claimed.
+
+API errors include a `resolution` action when the platform can prescribe a safe
+recovery. Follow that action without printing the stored credentials. In
+particular, `origin_unavailable` means resume with the saved setup credentials
+when the reservation is yours; it never authorizes a second hostname or a
+takeover attempt.
 
 ## Report the result
 

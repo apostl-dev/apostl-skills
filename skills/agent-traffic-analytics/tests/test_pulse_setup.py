@@ -25,13 +25,17 @@ class SetupHandler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(length) or b"{}")
         self.__class__.requests.append({"path": self.path, "headers": dict(self.headers), "body": body})
         if self.__class__.mode == "conflict" and self.path == "/api/v1/pulse/setups":
-            return self.respond(409, {"error": {"code": "origin_unavailable", "message": "This origin is already connected to Apostl Pulse."}})
+            return self.respond(409, {"error": {
+                "code": "origin_unavailable",
+                "message": "This origin is already connected to Apostl Pulse.",
+                "resolution": "Resume with the saved setup credentials if this is your setup.",
+            }})
         if self.path == "/api/v1/pulse/setups":
             return self.respond(201, {"data": {
                 "setup_id": "6d878eea-e29f-4a55-a021-ac940fbf81a7",
                 "status": "pending_deployment",
-                "origin": "https://docs.example.com",
-                "verification_url": "https://docs.example.com/llms.txt",
+                "origin": "https://docs.acme.dev",
+                "verification_url": "https://docs.acme.dev/llms.txt",
                 "expires_at": "2026-09-01T00:00:00Z",
                 "setup_token": "pulse_setup_" + "s" * 64,
                 "verify_url": self.server.base_url + "/api/v1/pulse/setups/6d878eea-e29f-4a55-a021-ac940fbf81a7/verify",
@@ -78,7 +82,7 @@ class PulseSetupCliTest(unittest.TestCase):
         stderr = io.StringIO()
         result = pulse_setup.main([
             "start",
-            "--origin", "https://docs.example.com",
+            "--origin", "https://docs.acme.dev",
             "--project-name", "Example docs",
             "--verification-path", "/llms.txt",
             "--agent-name", "Codex",
@@ -96,7 +100,7 @@ class PulseSetupCliTest(unittest.TestCase):
         output = json.loads(stdout.getvalue())
         self.assertEqual(output["status"], "pending_deployment")
         self.assertEqual(output["credentials_file"], str(self.credentials.resolve()))
-        self.assertEqual(SetupHandler.requests[0]["body"]["origin"], "https://docs.example.com")
+        self.assertEqual(SetupHandler.requests[0]["body"]["origin"], "https://docs.acme.dev")
 
     def test_verify_uses_setup_token_and_returns_only_the_human_claim_handoff(self):
         self.test_start_saves_secrets_with_mode_0600_without_printing_them()
@@ -122,7 +126,7 @@ class PulseSetupCliTest(unittest.TestCase):
 
         result = pulse_setup.main([
             "start",
-            "--origin", "https://docs.example.com",
+            "--origin", "https://docs.acme.dev",
             "--project-name", "Second project",
             "--platform-url", self.server.base_url,
             "--credentials", str(self.credentials),
@@ -131,7 +135,28 @@ class PulseSetupCliTest(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn("origin_unavailable", stderr.getvalue())
         self.assertIn("already connected", stderr.getvalue())
+        self.assertIn("Resume with the saved setup credentials", stderr.getvalue())
         self.assertFalse(self.credentials.exists())
+
+    def test_start_rejects_reserved_example_origin_before_api_mutation(self):
+        for origin in ("https://example.com", "https://docs.your-company.invalid"):
+            with self.subTest(origin=origin):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+
+                result = pulse_setup.main([
+                    "start",
+                    "--origin", origin,
+                    "--project-name", "Disposable demo",
+                    "--platform-url", self.server.base_url,
+                    "--credentials", str(self.credentials),
+                ], stdout=stdout, stderr=stderr)
+
+                self.assertEqual(result, 1)
+                self.assertIn("reserved example domain", stderr.getvalue())
+                self.assertIn("origin you can deploy", stderr.getvalue())
+                self.assertEqual(SetupHandler.requests, [])
+                self.assertFalse(self.credentials.exists())
 
 
 if __name__ == "__main__":
