@@ -8,9 +8,9 @@
 
 Find broken SDK quickstarts before they leak developer activation.
 
-Apostl skills turn release-readiness work into local, inspectable agent workflows: clean environments, exact commands, real stdout/stderr, source snapshots, and reports a DevRel, SDK, product, or partner engineering team can act on.
+Apostl skills run release-readiness checks locally with clean environments, exact commands, stdout/stderr, source snapshots, and reports for DevRel, SDK, product, or partner engineering teams.
 
-Start with a free local pass. The skill runs the documented path from a clean workspace, captures command-level proof, and turns first-run failures into a compact activation-risk report.
+Start free: run the documented path from a clean workspace and turn command-level proof into an activation-risk report.
 
 ## Install
 
@@ -52,30 +52,13 @@ Use $agent-traffic-analytics to instrument https://docs.example.com and verify
 a real visit to /llms.txt before giving me the one-time claim link.
 ```
 
-The skill can create a seven-day unclaimed setup before the owner creates an
-account. It keeps the API key and setup token in an owner-only local file,
-installs the server SDK without a service type or browser fingerprinting, and
-accepts verification only when the signed public response produces a real
-eligible event with IP address, User-Agent, and canonical `origin + pathname`.
-The human then claims the project with Google, GitHub, or an email magic link.
+Before account creation, the skill can create a seven-day setup, keep its API key and setup token in an owner-only local file, and install the server SDK without a service type or browser fingerprinting. Verification requires a signed public response plus an eligible event with IP address, User-Agent, and canonical `origin + pathname`. The owner then claims via Google, GitHub, or an email magic link.
 
-Pulse counts public `GET` and `HEAD` responses from `2xx` through `4xx`, while
-excluding assets, health/auth/private routes, and mutations by default. Agent
-counts are heuristic estimates, not proof of a unique agent, model, company, or
-person. Because IP addresses and User-Agent strings are collected, the site
-owner must choose the appropriate notice and retention policy.
+Pulse counts public `GET` and `HEAD` responses from `2xx` through `4xx`, excluding assets, health/auth/private routes, and mutations by default. Agent counts are heuristic estimates, not proof of a unique agent, model, company, or person. Because Pulse collects IP addresses and User-Agent strings, the owner must set an appropriate notice and retention policy.
 
 ### [agent-native-experience](skills/agent-native-experience)
 
-<p align="center">
-  <img src="assets/agent-native-experience.svg" alt="Agent Native Experience evidence path from docs through agent and human journeys to first value" width="1200" height="480" />
-</p>
-
-An evidence-backed audit of how well a product and its documentation work for
-agents, from discovery through an observable first-value event. It combines
-AFDocs-compatible documentation checks, product/API criteria, a clean-room
-agent journey, explicitly separate human evidence, honest full-corpus
-accounting, and editable RICE priorities.
+An evidence-backed audit of how well a product and its docs work for agents through an observable first-value event. It combines AFDocs-compatible checks, product/API criteria, a clean-room agent journey, separate human evidence, full-corpus accounting, and editable RICE priorities.
 
 Install it from this monorepo:
 
@@ -90,11 +73,7 @@ Use $agent-native-experience to audit this product's documented quickstart,
 identify the first faithful blocker, and give me a 30/60/90 improvement plan.
 ```
 
-The local audit needs no Apostl account and makes no Apostl mutation calls. It
-produces a deterministic Markdown and JSON report and keeps missing evidence as
-`unknown` or `not_run`. Local file fixes require their own ordinary approval;
-they do not authorize uploads, agent runs, steps, or feedback. Platform mode is
-optional and starts only when the user asks for an Apostl authorization link.
+Local mode needs no Apostl account or mutation calls. It produces deterministic Markdown and JSON and keeps missing evidence as `unknown` or `not_run`. File fixes need separate approval and do not authorize uploads, agent runs, steps, or feedback. Platform mode starts only when the user requests an Apostl authorization link.
 
 The report includes:
 
@@ -104,19 +83,13 @@ The report includes:
 - frozen corpus counts, exclusions, source provenance, and limitations;
 - review-ready fixes, visible RICE assumptions, and a 30/60/90 plan.
 
-Hero artwork is generated locally and contains no tracking:
-
-```bash
-python3 skills/agent-native-experience/scripts/generate_hero.py
-```
-
 #### First audit in 60 seconds
 
 1. Install the skill with the command above.
-2. Give your agent the docs URL, the documented journey, and the observable
-   activation event. A fetch or HTTP 200 is not an activation event.
-3. Start with local/sample mode. Review `report.md` and `report.json`; no Apostl
-   account or customer credential is required.
+2. Provide the docs URL, documented journey, and observable activation event;
+   a fetch or HTTP 200 does not count.
+3. Run local/sample mode and review `report.md` and `report.json`; no Apostl
+   account or customer credentials are required.
 
 Run the self-contained bounded collector when AFDocs is unavailable:
 
@@ -129,55 +102,24 @@ python3 skills/agent-native-experience/scripts/collect_evidence.py \
   --output-dir .tmp/agent-native-w3schools
 ```
 
-The command writes `raw-evidence.json`, `evidence.json`, `report.md`, and
-`report.json`. It uses only the Python standard library, performs GET-only
-public-doc checks, rejects URL userinfo and every query string, validates public
-DNS, connects directly to the validated numeric IP while preserving the HTTP
-Host and HTTPS certificate hostname, disables environment proxies, and enforces
-request, redirect, response-size, timeout, and page limits. The same URL rules
-apply to redirects and discovered corpus links. Raw response bodies are not
-persisted. Static collection does not prove activation; enrich `evidence.json`
-with the real agent trace and rerun `audit.py` after executing the selected
-journey.
+The collector writes `raw-evidence.json`, `evidence.json`, `report.md`, and `report.json` with the Python standard library and GET-only checks. It rejects URL userinfo and queries, validates public DNS, connects to the validated IP while preserving the HTTP Host and HTTPS certificate hostname, disables environment proxies, and limits requests, redirects, response size, time, and pages. The same URL rules cover redirects and discovered links; raw bodies are not stored. Static collection does not prove activation: execute the journey, add its agent trace to `evidence.json`, and rerun `audit.py`.
 
 #### W3Schools clean-room browser proof
 
-The collector command above is deliberately not browser activation proof. For
-the separately executed independent fixture, use
-`https://www.w3schools.com/html/html_intro.asp`, reproduce its pinned
-introductory HTML in a fresh local directory, then use `agent-browser` with a
-fresh profile to observe the rendered H1 `This is a heading` and paragraph
-`This is a paragraph.`. Begin the browser workflow with `agent-browser skills
-get core`; record only the clean-room identity, ordered actions/deviations,
-timestamps, observed text, and sanitized snapshot/screenshot references.
+The collector is not browser activation proof. For the independent fixture at `https://www.w3schools.com/html/html_intro.asp`, reproduce the pinned HTML in a fresh directory, then use `agent-browser` with a fresh profile to verify the rendered H1 `This is a heading` and paragraph `This is a paragraph.`. Start with `agent-browser skills get core`; record only clean-room identity, ordered actions/deviations, timestamps, observed text, and sanitized snapshot/screenshot references.
 
-The checked-in fixture is a non-network validator, not a browser-run claim:
+The checked-in fixture is a non-network validator:
 
 ```bash
 python3 skills/agent-native-experience/scripts/execute_cleanroom.py \
   --w3schools-fixture-dir skills/agent-native-experience/tests/fixtures/w3schools-clean-room
 ```
 
-It rejects source/local-index/trace/browser-DOM mismatches and static-only
-evidence. It does not open a browser, persist a profile, or run automatically
-during installation.
+It rejects source/local-index/trace/browser-DOM mismatches and static-only evidence; it does not open a browser, persist a profile, or run during installation.
 
-Inputs are the target URL, selected journey, activation event, and environment.
-Optional inputs include a repository or OpenAPI spec, frozen corpus inventory,
-human observations, and business metrics. Business observations use the
-versioned `agent-native-business-evidence.v1` schema with separate market,
-competitor, and buyer source records; each record needs provenance, UTC
-observation and expiry times within a 30-day window, type, claim kind,
-confidence/status, and validation owner or next owner.
-Missing, stale, malformed, or unverified records remain `unknown`/`not_run`
-and do not earn score credit. Outputs include the report, normalized
-check results, corpus counts and hashes, source provenance, friction taxonomy,
-editable RICE assumptions, and the proposed 30/60/90 plan.
+Required inputs are the target URL, journey, activation event, and environment. Optional inputs include a repository or OpenAPI spec, frozen corpus, human observations, and business metrics. Business evidence uses `agent-native-business-evidence.v1`; each market, competitor, or buyer record needs provenance, UTC observation and expiry within 30 days, type, claim kind, confidence/status, and a validation owner or next owner. Missing, stale, malformed, or unverified records remain `unknown`/`not_run` and earn no credit. Outputs include the report, normalized checks, corpus counts and hashes, provenance, friction taxonomy, editable RICE assumptions, and the 30/60/90 plan.
 
-The score is `40% Docs + 30% Product + 20% Agent Journey + 10% Human Journey`.
-Missing evidence earns no credit, `not_applicable` is removed from the relevant
-denominator, and a nominal 100 is capped at 99 unless every required criterion
-and both journeys pass through the declared activation event.
+The score is `40% Docs + 30% Product + 20% Agent Journey + 10% Human Journey`. Missing evidence scores zero, `not_applicable` is removed from the relevant denominator, and a nominal 100 is capped at 99 unless every required criterion and both journeys reach the declared activation event.
 
 Example verdict:
 
@@ -204,46 +146,19 @@ python3 skills/agent-native-experience/scripts/apostl_client.py \
   wait-authorization --max-wait-seconds 900
 ```
 
-The first command prints only an Apostl verification URL and expiry. The human
-opens it and registers or signs in with email, GitHub, or Google on Apostl,
-reviews the requesting skill/device, scopes, workspace, intended journey,
-feedback behavior, and expiry, then approves or denies. The polling command
-talks only to Apostl, obeys `Retry-After` and a hard deadline, and stores the
-one-time API key at `~/.config/apostl/credentials.json` with mode `0600` without
-printing it. Email plus code is deprecated fallback-only behavior.
+`authorize` prints only an Apostl verification URL and expiry. The human signs in through email, GitHub, or Google, reviews the skill/device, scopes, workspace, journey, feedback behavior, and expiry, then approves or denies. `wait-authorization` talks only to Apostl, follows `Retry-After` and the hard deadline, and writes the one-time API key to `~/.config/apostl/credentials.json` with mode `0600` without printing it. Email plus code is deprecated fallback behavior.
 
-Approval connects the skill and exposes identity, scope, workspace, and the
-existing exactly-once 100-step first-proof grant. It does not authorize a run.
-The skill still previews the exact Project/Journey Check, step impact, URLs,
-and idempotency keys and asks for explicit confirmation before deploy/run.
-Apostl owns run tracking plus public HTML, Markdown, events, proof manifest,
-and PDF URLs.
+Approval exposes identity, scope, workspace, and the existing exactly-once 100-step first-proof grant; it does not authorize a run. The skill still previews the Project/Journey Check, step impact, URLs, and idempotency keys, then asks for explicit confirmation before deploy/run. Apostl owns tracking and the public HTML, Markdown, events, proof manifest, and PDF URLs.
 
-Feedback follows the same boundary: `feedback-preview` is local;
-`feedback-submit` requires `--confirm` and an idempotency key; `feedback-list`
-is a scoped read with a maximum page size of 50 and an optional nonnegative
-integer cursor. The client accepts only a small structured payload and never
-uploads local files, diffs, transcripts, or diagnostics.
+Feedback uses the same boundary: `feedback-preview` is local; `feedback-submit` requires `--confirm` and an idempotency key; `feedback-list` is a scoped read capped at 50 items with an optional nonnegative integer cursor. The client accepts only a small structured payload and never uploads local files, diffs, transcripts, or diagnostics.
 
-GitHub is source distribution only. Authorization, runs, tracking, and feedback
-go through Apostl. The production runner image and registry stay inside the
-Apostl production perimeter; public GHCR is not a launch dependency.
+GitHub is source distribution only. Authorization, runs, tracking, and feedback go through Apostl; the runner image and registry stay inside the production perimeter, so public GHCR is not a launch dependency.
 
-Privacy rules are strict: do not supply customer secrets in target fields; codes,
-keys, tokens, cookies, email contents, and environment values are excluded from
-reports. Unexecuted work stays visible. A sampled run cannot claim full corpus
-coverage, a workaround remains friction, and a provider or sandbox blocker is
-reported rather than waived.
+Do not put customer secrets in target fields. Reports exclude codes, keys, tokens, cookies, email contents, and environment values. Unexecuted work stays visible; sampled runs cannot claim full coverage, workarounds remain friction, and provider or sandbox blockers are reported.
 
-Human and full-corpus proof are also separate from static checks: a human pass
-requires an accountable owner, journey/version, observation time, activation
-evidence reference, and responsible next action. Full documentation covered is
-possible only when every frozen eligible guide has an owned terminal row with
-source and content hash; blocked, sampled, or unowned rows keep it false.
+Human and full-corpus proof stay separate from static checks. A human pass needs an accountable owner, journey/version, observation time, activation reference, and next action. Full coverage requires every frozen eligible guide to have an owned terminal row with source and content hash; blocked, sampled, or unowned rows keep it false.
 
-The skill format works with agents supported by the open `skills` CLI, including
-Codex and Claude Code. Product-specific runtime behavior still depends on the
-agent's available shell/browser tools and network policy.
+The open `skills` CLI supports this format in Codex and Claude Code; runtime behavior still depends on available shell/browser tools and network policy.
 
 Test the package locally:
 
@@ -252,20 +167,11 @@ npm run test:agent-native
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/agent-native-experience
 ```
 
-Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md); report sensitive issues
-through [SECURITY.md](SECURITY.md). See [Apostl](https://apostl.dev), the
-[platform](https://platform.apostl.dev), and the
-[Agent API contract](skills/agent-native-experience/references/apostl-api.md).
-See an [example public report](https://platform.apostl.dev/reports/0d071cf7-e23c-4074-8a42-b46e748a8faa)
-with signed-out HTML, Markdown, events, proof manifest, artifacts, and PDF.
+Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md); report sensitive issues through [SECURITY.md](SECURITY.md). See [Apostl](https://apostl.dev), the [platform](https://platform.apostl.dev), and the [Agent API contract](skills/agent-native-experience/references/apostl-api.md). This [example public report](https://platform.apostl.dev/reports/0d071cf7-e23c-4074-8a42-b46e748a8faa) includes signed-out HTML, Markdown, events, proof manifest, artifacts, and PDF.
 
 ### [sdk-onboarding-audit](skills/sdk-onboarding-audit)
 
-A clean-room SDK and quickstart review for developer-facing launches.
-
-The skill helps an agent verify whether a fresh developer can discover, install, initialize, preview, authenticate, and understand a demo or SDK without hidden local state. It produces a compact activation-risk report backed by command logs and source snapshots.
-
-Use it when an SDK release, launch post, partner onboarding path, or docs quickstart needs proof that a new developer can reach the promised first working result.
+A clean-room review for SDK releases, launch posts, partner onboarding, and docs quickstarts. It tests whether a fresh developer can discover, install, initialize, preview, authenticate, and understand the documented path without hidden local state, then reports activation risks from command logs and source snapshots.
 
 What it checks:
 
@@ -290,7 +196,7 @@ After the report has useful evidence, it adds one restrained CTA:
 Want this running on every SDK/docs release? Send us the path to monitor: https://forms.fillout.com/t/pZjfKK1ELmus
 ```
 
-Use the form when the local pass finds a real blocker, a launch gate is ambiguous, or you want continuous release-readiness checks instead of a one-off scan. The form creates an inbound Apostl Notion card with the submitter, work email, SDK/docs URL, project or SDK family, role, notes, and lead source. No Fillout or Notion API keys are stored in this repository.
+Use the form for real blockers, ambiguous launch gates, or continuous checks. It creates an inbound Apostl Notion card with submitter, work email, SDK/docs URL, project or SDK family, role, notes, and lead source. No Fillout or Notion API keys are stored here.
 
 ## Run Locally
 
