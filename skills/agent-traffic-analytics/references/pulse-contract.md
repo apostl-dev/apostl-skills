@@ -57,7 +57,7 @@ POST https://platform.apostl.dev/api/v1/pulse/setups
 Content-Type: application/json
 
 {
-  "origin": "https://docs.example.com",
+  "origin": "https://replace-me.invalid",
   "verification_path": "/llms.txt",
   "project_name": "Example docs",
   "environment": "production",
@@ -65,11 +65,18 @@ Content-Type: application/json
 }
 ```
 
+`replace-me.invalid` is an intentionally rejected placeholder. Before sending
+the request, replace it with an authorized public HTTPS origin where the Pulse
+server middleware can be deployed. Apostl rejects reserved documentation
+domains such as `example.com`, `.example`, `.invalid`, and `.test` before
+issuing credentials.
+
 The response returns the API key, ingest endpoint, opaque setup token, verify
 URL, public verification URL, and expiry once. The setup expires after seven
 days if it is not claimed. Store credentials locally with owner-only `0600`
 permissions and never print them. An origin already owned or reserved returns
 HTTP `409` with `error.code = origin_unavailable`; no second project is created.
+Error responses also include a human-readable `resolution` action.
 
 ## Verification and claim
 

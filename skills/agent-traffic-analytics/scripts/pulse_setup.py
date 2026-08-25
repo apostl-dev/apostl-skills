@@ -22,11 +22,12 @@ USER_AGENT = "Apostl-Agent-Traffic-Analytics-Skill/1.0"
 
 
 class ApiError(RuntimeError):
-    def __init__(self, status: int, code: str, message: str) -> None:
+    def __init__(self, status: int, code: str, message: str, resolution: str | None = None) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
+        self.resolution = resolution
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -66,7 +67,10 @@ def main(argv: list[str] | None = None, *, stdout: TextIO = sys.stdout, stderr: 
         else:
             result = show_setup(args.credentials)
     except ApiError as error:
-        print_json({"error": {"status": error.status, "code": error.code, "message": error.message}}, stderr)
+        details: dict[str, Any] = {"status": error.status, "code": error.code, "message": error.message}
+        if error.resolution:
+            details["resolution"] = error.resolution
+        print_json({"error": details}, stderr)
         return 1
     except (OSError, RuntimeError, ValueError, KeyError) as error:
         print_json({"error": {"code": "local_setup_error", "message": str(error)}}, stderr)
@@ -169,7 +173,8 @@ def api_request(url: str, payload: dict[str, Any], *, bearer_token: str | None =
         details = payload.get("error") if isinstance(payload, dict) else None
         code = str(details.get("code", "http_error")) if isinstance(details, dict) else "http_error"
         message = str(details.get("message", f"Apostl returned HTTP {error.code}.")) if isinstance(details, dict) else f"Apostl returned HTTP {error.code}."
-        raise ApiError(error.code, code, message) from None
+        resolution = str(details.get("resolution")) if isinstance(details, dict) and details.get("resolution") else None
+        raise ApiError(error.code, code, message, resolution) from None
     except urllib.error.URLError as error:
         raise RuntimeError(f"Apostl request failed: {error.reason}") from None
 
@@ -232,7 +237,17 @@ def canonical_origin(value: str) -> str:
         raise ValueError("Origin must be a public HTTPS origin without credentials, query, or fragment.")
     if parsed.path not in ("", "/") or parsed.port not in (None, 443):
         raise ValueError("Origin must not include a path or custom port.")
-    return f"https://{parsed.hostname.lower()}"
+    host = parsed.hostname.lower()
+    if host in ("example", "invalid", "test", "example.com", "example.org", "example.net") or host.endswith((
+        ".example",
+        ".invalid",
+        ".test",
+        ".example.com",
+        ".example.org",
+        ".example.net",
+    )):
+        raise ValueError("Origin uses a reserved example domain. Replace it with a public HTTPS origin you can deploy to.")
+    return f"https://{host}"
 
 
 def canonical_path(value: str) -> str:
