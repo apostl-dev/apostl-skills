@@ -29,7 +29,7 @@ before changing collection, verification, identity, or claim behavior.
 ## Fit and payoff
 
 Use Pulse for server-rendered SaaS sites, developer docs, agent-native products,
-public API surfaces, Markdown, and `llms.txt`. The owner gets a live five-minute
+public API surfaces, Markdown, and `llms.txt`. The owner gets a live 30-minute
 agent estimate, a 30-day page ranking, and inspectable proof that the deployed
 middleware produced a real event. For an existing Express or Next.js server,
 the code change is one client plus one middleware or handler wrapper; budget
