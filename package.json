@@ -8,6 +8,7 @@
     "test": "node --test test/*.test.mjs test/e2e/*.test.mjs",
     "skillify": "tmpdir=$(mktemp -d); rsync -a --exclude .git ./ \"$tmpdir/apostl-skillify-check/\"; cd \"$tmpdir/apostl-skillify-check\" && gbrain skillify check skills/sdk-onboarding-audit/scripts/run_sdk_onboarding_audit.py && gbrain skillify check skills/agent-native-experience/scripts/audit.py; rc=$?; rm -r \"$tmpdir\"; exit $rc",
     "test:agent-native": "python3 -m unittest discover -s skills/agent-native-experience/tests -v && node --test test/agent-native-experience.test.mjs test/e2e/agent-native-experience-smoke.test.mjs",
+    "test:agent-traffic": "python3 -m unittest discover -s skills/agent-traffic-analytics/tests -v && node --test test/agent-traffic-analytics.test.mjs",
     "skills:list": "npx skills add . --list"
   },
   "keywords": [
