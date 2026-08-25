@@ -34,6 +34,37 @@ Run a clean-env onboarding audit for this SDK launch. Test the documented quicks
 
 ## Available Skills
 
+### [agent-traffic-analytics](skills/agent-traffic-analytics)
+
+Server-side analytics for one concrete question: how many estimated AI agents
+use your public product, and which pages do they visit?
+
+Install it from this monorepo:
+
+```bash
+npx skills add apostl-dev/apostl-skills --skill agent-traffic-analytics -g -y
+```
+
+Then ask your agent:
+
+```text
+Use $agent-traffic-analytics to instrument https://docs.example.com and verify
+a real visit to /llms.txt before giving me the one-time claim link.
+```
+
+The skill can create a seven-day unclaimed setup before the owner creates an
+account. It keeps the API key and setup token in an owner-only local file,
+installs the server SDK without a service type or browser fingerprinting, and
+accepts verification only when the signed public response produces a real
+eligible event with IP address, User-Agent, and canonical `origin + pathname`.
+The human then claims the project with Google, GitHub, or an email magic link.
+
+Pulse counts public `GET` and `HEAD` responses from `2xx` through `4xx`, while
+excluding assets, health/auth/private routes, and mutations by default. Agent
+counts are heuristic estimates, not proof of a unique agent, model, company, or
+person. Because IP addresses and User-Agent strings are collected, the site
+owner must choose the appropriate notice and retention policy.
+
 ### [agent-native-experience](skills/agent-native-experience)
 
 <p align="center">
