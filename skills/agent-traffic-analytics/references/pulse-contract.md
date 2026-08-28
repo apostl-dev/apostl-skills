@@ -48,13 +48,28 @@ human, autonomous agent, model, company, or paying customer. Top Pages uses a
 30-day window and ranks canonical pages by estimated agents, with request count
 shown alongside it.
 
-## Agent-first setup API
+## Auth.md registration and agent-first setup API
 
-Create an unclaimed setup:
+The canonical instructions are `https://apostl.dev/auth.md`. The platform hosts
+Protected Resource Metadata at
+`/.well-known/oauth-protected-resource`, Authorization Server Metadata at
+`/.well-known/oauth-authorization-server`, and the advertised JWKS. Discover and
+validate those documents before registration. The current supported identity
+types are `anonymous` and `service_auth`; Pulse autonomous setup uses
+`anonymous`.
+
+Anonymous `POST /agent/identity` returns a service-signed identity assertion and
+one-time claim token. Exchange the assertion at the advertised token endpoint
+with `urn:ietf:params:oauth:grant-type:jwt-bearer` and the exact Agent API
+resource. Before claim, the resulting short-lived Bearer credential must have
+only `pulse:setup` scope. There is no refresh token.
+
+Create the linked unclaimed setup with that pre-claim credential:
 
 ```http
 POST https://platform.apostl.dev/api/v1/pulse/setups
 Content-Type: application/json
+Authorization: Bearer <authmd_pre_claim_access_token>
 
 {
   "origin": "https://replace-me.invalid",
@@ -72,11 +87,12 @@ domains such as `example.com`, `.example`, `.invalid`, and `.test` before
 issuing credentials.
 
 The response returns the API key, ingest endpoint, opaque setup token, verify
-URL, public verification URL, and expiry once. The setup expires after seven
-days if it is not claimed. Store credentials locally with owner-only `0600`
-permissions and never print them. An origin already owned or reserved returns
-HTTP `409` with `error.code = origin_unavailable`; no second project is created.
-Error responses also include a human-readable `resolution` action.
+URL, public verification URL, and expiry once. The registration response also
+contains the claim token and assertion. Store every credential locally with
+owner-only `0600` permissions and never print them. The setup and registration
+expire after seven days if not claimed. An origin already owned or reserved
+returns HTTP `409` with `error.code = origin_unavailable`; no second project is
+created. Error responses also include a human-readable `resolution` action.
 
 ## Verification and claim
 
@@ -94,9 +110,17 @@ Verification requires both the signed public response and resulting real event.
 
 Poll the returned verify URL with `Authorization: Bearer <setup_token>`. Before
 the event arrives it returns `waiting_for_event`; afterward it returns
-`verified` and an opaque one-time human claim URL. The API key is never placed
-in that URL. Claim requires Google, GitHub, or email magic link authentication.
-The ingest key remains active after claim; claiming does not rotate it.
+`verified`. Then use the Auth.md claim endpoint with the stored claim token and
+the owner's intended Apostl email. Show the returned six-digit user code and
+verification URI only to that owner. Claim requires the same verified email via
+Google, GitHub, or an email magic link.
+
+Poll the token endpoint no faster than the advertised interval using
+`urn:workos:agent-auth:grant-type:claim`. Honor `authorization_pending`,
+`slow_down`, and `Retry-After`. Successful claim revokes pre-claim access,
+creates the post-claim Agent API credential, and moves every linked verified
+Pulse installation into the same owner workspace. The ingest key remains active
+after claim; claiming does not rotate it. OAuth revocation is idempotent.
 
 ## Operational limits
 
