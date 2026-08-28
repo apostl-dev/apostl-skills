@@ -18,7 +18,7 @@ npx skills add apostl-dev/apostl-skills --list
 
 ### [agent-traffic-analytics](skills/agent-traffic-analytics)
 
-Connect Apostl Pulse to your website, verify a real visit, and hand the owner a one-time claim link. Supported runtimes and troubleshooting are in the [full setup flow](skills/agent-traffic-analytics/SKILL.md).
+Self-register through Auth.md, connect Apostl Pulse to your website, verify a real visit, and hand the owner one claim that binds the agent and Pulse project. Supported runtimes and troubleshooting are in the [full setup flow](skills/agent-traffic-analytics/SKILL.md).
 
 ```bash
 npx skills add apostl-dev/apostl-skills --skill agent-traffic-analytics -g -y

@@ -1,6 +1,6 @@
 ---
 name: agent-traffic-analytics
-description: Install and verify Apostl Pulse server-side analytics for public AI-agent traffic. Use when someone asks how many AI agents visit a website, docs, API, llms.txt, Markdown, or other public pages; wants per-page agent analytics; wants to add the Pulse SDK; or wants an agent to create an unclaimed Pulse setup and hand the owner a one-time claim link.
+description: Install and verify Apostl Pulse server-side analytics for public AI-agent traffic. Use when someone asks how many AI agents visit a website, docs, API, llms.txt, Markdown, or other public pages; wants per-page agent analytics; wants to add the Pulse SDK; or wants an agent to self-register through Auth.md, finish setup, and hand the owner one account claim.
 ---
 
 # Agent Traffic Analytics
@@ -48,11 +48,21 @@ If the user supplied one, explain that boundary and obtain an authorized public
 origin before creating a setup. Do not use a reserved domain as a disposable
 production demo.
 
-## Start without an account
+## Start through Auth.md without an account
 
-An agent may create an unclaimed setup without waiting for a human. This is a
-real Apostl API mutation that reserves the origin for seven days, so do it only
-when the user has asked to set up or install Pulse for that origin.
+An agent may register itself and create an unclaimed setup without waiting for a
+human. This is a real Apostl API mutation that reserves the origin for seven
+days, so do it only when the user has asked to set up or install Pulse for that
+origin.
+
+The helper must discover the live Auth.md contract before mutating state. It
+reads Protected Resource Metadata and Authorization Server Metadata from
+`platform.apostl.dev`, fetches the canonical `https://apostl.dev/auth.md`, and
+requires `anonymous` registration plus Bearer header support. It then registers
+an anonymous identity, exchanges Apostl's signed assertion for a short-lived
+token whose only scope is `pulse:setup`, and uses that token to create the linked
+Pulse setup. Stop before registration if issuer, endpoint origin, supported
+method, resource, or the Auth.md H1 does not match discovery.
 
 Run from this skill directory:
 
@@ -61,19 +71,21 @@ python3 scripts/pulse_setup.py start \
   --origin https://replace-me.invalid \
   --verification-path /llms.txt \
   --project-name "My public site" \
-  --agent-name "Codex"
+  --agent-name "Codex" \
+  --device-name "Owner workstation"
 ```
 
 Replace `replace-me.invalid` before running. The helper rejects it and other
 reserved documentation domains before it contacts Apostl.
 
-The command prints non-secret setup metadata and the local credentials path.
-It stores the API key and opaque setup token in an owner-only `0600` file. Never
-print, paste into chat, commit, or construct a URL from either raw secret. The
-only capability URL to share is the one-time `claim_url` returned by Apostl
-after verification; it never contains the API key. If the origin is already
-owned or reserved, stop and report the explicit `origin_unavailable` response;
-do not create another project or use a variant hostname to bypass it.
+The command prints non-secret registration/setup metadata and the local
+credentials path. It stores the identity assertion, claim token, Auth.md access
+token, Pulse API key, and Pulse setup token in one owner-only `0600` file. Never
+print, paste into chat, commit, or construct a URL from a raw secret. The only
+capability URL to share is the Auth.md `verification_uri` returned later by the
+`claim` command; it never contains the API key. If the origin is already owned
+or reserved, stop and report the explicit `origin_unavailable` response; do not
+create another project or use a variant hostname to bypass it.
 
 ## Install the server SDK
 
@@ -135,11 +147,41 @@ IP address, User-Agent, and exact canonical page. A header, HTTP 200, SDK log,
 or synthetic database row alone is not proof.
 
 If the status is `waiting_for_event`, wait briefly for the SDK batch and rerun
-the same command. Do not create a replacement setup. If it is `verified`, give
-the human only the opaque one-time `claim_url`. The owner signs in with Google,
-GitHub, or an email magic link; password authentication is not available. The
+the same command. Do not create a replacement setup. Once it is `verified`, ask
+for the email the owner will use for Apostl and start the single Auth.md claim:
+
+```bash
+python3 scripts/pulse_setup.py claim \
+  --credentials /absolute/path/to/pulse.json \
+  --email owner@example.com
+```
+
+Give the owner the returned six-digit `user_code` and `verification_uri`. The
+owner opens that URL, signs in with the same verified email through Google,
+GitHub, or an email magic link, and enters the code there. Do not ask them to
+paste the code back into agent chat. Password authentication is not available.
+
+Poll no faster than the returned interval:
+
+```bash
+python3 scripts/pulse_setup.py claim-status --credentials /absolute/path/to/pulse.json
+```
+
+Honor `retry_after` for `authorization_pending` and `slow_down`. If the
+short-lived code window expires, `claim-status` automatically obtains a fresh
+ceremony and returns the new `user_code` and `verification_uri` for the same
+email and registration. A successful poll writes the post-claim Agent API token
+and identity assertion into the same owner-only file, removes the revoked
+pre-claim token locally, and reports no raw credential. One claim binds both the
+Agent API registration and verified Pulse project to the owner's workspace. The
 ingest API key remains active after claim and must not be rotated merely because
 the project was claimed.
+
+To disconnect the current Auth.md access token without revealing it:
+
+```bash
+python3 scripts/pulse_setup.py revoke --credentials /absolute/path/to/pulse.json
+```
 
 API errors include a `resolution` action when the platform can prescribe a safe
 recovery. Follow that action without printing the stored credentials. In
@@ -154,7 +196,9 @@ Return:
 - origin and exact verification page;
 - target integration files and tests run;
 - whether the signed public response and resulting real event both passed;
-- claim URL only when verified, plus its seven-day setup expiry;
+- Auth.md registration ID and pre-claim scope, never raw credentials;
+- claim `verification_uri`, six-digit code, and expiry only after verification;
+- whether final Auth.md claim connected the registration and Pulse project;
 - any privacy or deployment disclosure the owner must address;
 - blockers as blockers, without claiming traffic measurement is live.
 

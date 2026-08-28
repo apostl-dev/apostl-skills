@@ -23,6 +23,9 @@ test('skill preserves measurement, privacy, proof, and claim boundaries', () => 
   assert.match(combined, /GET[\s\S]*HEAD[\s\S]*2xx[\s\S]*4xx/u);
   assert.match(combined, /signed[\s\S]*real event/iu);
   assert.match(combined, /seven days/iu);
+  assert.match(combined, /Auth\.md[\s\S]*oauth-protected-resource[\s\S]*oauth-authorization-server/iu);
+  assert.match(combined, /anonymous[\s\S]*pulse:setup[\s\S]*claim-status/iu);
+  assert.match(combined, /urn:workos:agent-auth:grant-type:claim/iu);
   assert.match(combined, /Google[\s\S]*GitHub[\s\S]*email magic link/iu);
   assert.match(combined, /heuristic[\s\S]*(?:does not|cannot) prove/iu);
   assert.doesNotMatch(combined, /password authentication is available/iu);

@@ -1,4 +1,4 @@
 interface:
   display_name: "Agent Traffic Analytics"
   short_description: "Measure public AI agent traffic with Apostl Pulse"
-  default_prompt: "Use $agent-traffic-analytics to install Apostl Pulse, verify a real public page event, and hand me the one-time claim link."
+  default_prompt: "Use $agent-traffic-analytics to self-register through Auth.md, install Apostl Pulse, verify a real public page event, and hand me one account claim."
