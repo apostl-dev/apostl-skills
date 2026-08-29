@@ -2,8 +2,38 @@
 
 Use this reference when implementing or reviewing an Apostl Pulse integration.
 The hosted platform owns classification, retention configuration, claims, and
-dashboards. The open-source SDK owns bounded server-side request collection and
-delivery.
+dashboards. The open-source Cloudflare Worker and server SDK own bounded
+server-side request collection and delivery.
+
+## Collector routing
+
+Choose the collector before creating a setup or editing the target. Prefer the
+operator's Cloudflare control-plane state for the exact hostname. A trusted
+`CF-Ray` on a live response can corroborate that the request crossed Cloudflare,
+but a header alone is spoofable. Cloudflare nameservers are insufficient because
+an individual record can be DNS-only.
+
+Use the MIT-licensed
+`https://github.com/apostl-dev/pulse-cloudflare-worker` when the Cloudflare
+control plane confirms the exact hostname is proxied, or when a trusted live
+response carries independently established Cloudflare edge evidence such as
+`CF-Ray`. The operator must also be able to edit the matching Worker Route. Use
+the server SDK at `https://github.com/apostl-dev/pulse-sdk` when the hostname is
+not routed through Cloudflare, including a DNS-only record backed by a controlled
+server.
+
+If the target is unreachable or proxy status is ambiguous, stop and name the one
+missing fact. If route or source authority is missing, stop and name the required
+permission. Do not guess, silently switch collectors, or substitute another
+hostname. If a Cloudflare Worker or Pages app already owns the hostname, integrate
+the observation logic into that controlled edge runtime or use an explicitly
+supported non-looping route. Never stack a second Worker blindly.
+
+Exactly one Pulse collector may own a hostname/route. Do not deploy the Worker
+and SDK on the same request path unless the user explicitly authorizes a measured
+migration with deduplication proof. For an existing origin, use a narrow Worker
+Route and preserve forwarding to that origin. Do not use a Worker Custom Domain
+that can route back to itself and form a loop.
 
 ## Event boundary
 
@@ -34,6 +64,29 @@ Public HTML, Markdown, `llms.txt`, text files, documentation URLs, and ordinary
 public `404` pages are eligible. Application input cannot override this rule:
 ingest recomputes eligibility from the method, status, and canonical path before
 storing every schema-version-2 event.
+
+## Cloudflare Worker boundary
+
+The Worker template proxies the origin without changing its response and sends
+telemetry in `ctx.waitUntil()` so collection stays background and fail-open. A
+delivery error must not delay or fail origin traffic. Store the API key only as
+the `APOSTL_PULSE_API_KEY` Worker secret and keep the endpoint in
+`APOSTL_PULSE_ENDPOINT`; neither belongs in source, config, logs, screenshots, or
+chat.
+
+For every representable request reaching the authorized route, capture the raw
+`CF-Connecting-IP`, bounded full User-Agent, method, final origin status, timing,
+surface hints, canonical host and pathname, and the signed verification response
+when challenged. Submit every representable request without a local agent or
+User-Agent allowlist so future and unknown agents can be classified centrally.
+Never capture or forward query data, request bodies, cookies, authorization,
+URL credentials, or arbitrary headers to Pulse.
+
+Before production, complete a privacy review covering notice, legal basis,
+access, and retention for IP address and User-Agent processing. After deployment,
+require signed challenge proof, a genuine request, Cloudflare invocation proof
+for the exact Worker Route, and a positive Pulse-side delta. A successful deploy,
+HTTP response, synthetic event, or unchanged dashboard is not proof.
 
 ## Identity and interpretation
 
@@ -122,7 +175,7 @@ creates the post-claim Agent API credential, and moves every linked verified
 Pulse installation into the same owner workspace. The ingest key remains active
 after claim; claiming does not rotate it. OAuth revocation is idempotent.
 
-## Operational limits
+## Server SDK operational limits
 
 - Node.js 20 or newer.
 - Up to 50 events and 256 KiB per batch.
